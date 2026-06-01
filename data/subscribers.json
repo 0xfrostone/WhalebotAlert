@@ -1,0 +1,65 @@
+{
+  "1944580692": {
+    "name": "yui",
+    "tokens": [
+      "LINK",
+      "PEPE",
+      "UNI"
+    ],
+    "threshold": 10000,
+    "riskFilter": "ALL",
+    "active": false,
+    "alertCount": 0,
+    "joinedAt": "2026-05-30T18:48:27.260Z"
+  },
+  "2106924638": {
+    "name": "Rie",
+    "tokens": [
+      "LINK"
+    ],
+    "threshold": 50000,
+    "riskFilter": "HIGH_EXTREME",
+    "active": false,
+    "alertCount": 0,
+    "joinedAt": "2026-05-30T18:47:25.024Z"
+  },
+  "5119003079": {
+    "name": "frostTone",
+    "tokens": [
+      "UNI",
+      "LINK",
+      "PEPE"
+    ],
+    "threshold": 1000,
+    "riskFilter": "ALL",
+    "active": false,
+    "alertCount": 0,
+    "joinedAt": "2026-05-29T11:19:54.468Z"
+  },
+  "5345373659": {
+    "name": "Innwerkara",
+    "tokens": [
+      "UNI",
+      "LINK",
+      "PEPE"
+    ],
+    "threshold": 10000,
+    "riskFilter": "ALL",
+    "active": true,
+    "alertCount": 0,
+    "joinedAt": "2026-05-29T11:47:12.681Z"
+  },
+  "7220530689": {
+    "name": "shihao.g",
+    "tokens": [
+      "UNI",
+      "LINK",
+      "PEPE"
+    ],
+    "threshold": 50000,
+    "riskFilter": "ALL",
+    "active": false,
+    "alertCount": 0,
+    "joinedAt": "2026-05-30T18:47:25.040Z"
+  }
+}
