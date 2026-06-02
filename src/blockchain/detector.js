@@ -177,7 +177,7 @@ function calculateWhaleScore(txData) {
   console.log(`   [Whale Score Breakdown]`);
   console.log(`      txSize=${txSizeScore} | lpImpact=${lpImpactScore} | freq=${freqScore} | smartMoney=${smartMoneyScore} | walletRep=${walletRepScore}`);
   
-  // Weighted formula
+  // Weighted formula (total bobot = 1.00, jadi skor otomatis 0-100)
   const rawScore = (
     0.25 * txSizeScore +
     0.30 * lpImpactScore +
@@ -186,15 +186,10 @@ function calculateWhaleScore(txData) {
     0.15 * smartMoneyScore
   );
   
-  console.log(`      rawScore=${rawScore.toFixed(2)}`);
-  
-  // Sigmoid normalization
-  const normalized = 100 / (1 + Math.exp(-0.1 * (rawScore - 50)));
-  
-  console.log(`      normalized=${normalized.toFixed(2)}`);
+  console.log(`      finalScore=${rawScore.toFixed(2)}`);
   
   return {
-    total: Math.round(normalized),
+    total: Math.round(rawScore),
     breakdown: {
       txSize: Math.round(txSizeScore),
       lpImpact: Math.round(lpImpactScore),
