@@ -32,7 +32,7 @@
     ],
     "threshold": 1000,
     "riskFilter": "ALL",
-    "active": false,
+    "active": true,
     "alertCount": 0,
     "joinedAt": "2026-05-29T11:19:54.468Z"
   },
