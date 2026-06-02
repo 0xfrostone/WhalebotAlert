@@ -20,6 +20,8 @@ function setupStartCommand(bot, subscriberStore) {
 
     const user = subscriberStore.get(chatId, { name: msg.from.first_name });
     user.name = msg.from.first_name;
+    // /start selalu reset status ke MATI — user harus klik "Mulai Tracking" untuk aktif
+    user.active = false;
     subscriberStore.set(chatId, user);
 
     const text = [

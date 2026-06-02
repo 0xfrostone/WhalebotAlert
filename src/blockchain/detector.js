@@ -83,11 +83,12 @@ const poolTVLEstimates = {
   'UNI_WETH_v2':   8_500_000,    // ~$8.5M TVL (Uniswap V2)
   'UNI_WETH_v3':  15_000_000,    // ~$15M TVL  (Uniswap V3)
 
-  // LINK — institusional, TVL signifikan
+  // LINK — institusional, TVL signifikan (DexScreener: ~$20.8M)
   'LINK_WETH_v2': 12_000_000,    // ~$12M TVL  (Uniswap V2)
   'LINK_WETH_v3': 20_000_000,    // ~$20M TVL  (Uniswap V3)
 
   // PEPE — meme coin, TVL fluktuatif
+  'PEPE_WETH_v2': 10_000_000,    // ~$10M TVL  (Uniswap V2)
   'PEPE_WETH_v3': 25_000_000,    // ~$25M TVL  (Uniswap V3)
 };
 
@@ -289,16 +290,14 @@ async function analyzeSwap(swapData, config) {
   }
   console.log(`   ✅ FILTER 3 PASS: Whale score OK`);
   
-  // Tentukan risk category
+  // Risk category (informasi untuk user, filtering dilakukan per-user di broadcast)
+  // REMOVED: Filter 4 yang menolak semua LOW risk
+  // Alasan: Pool dengan TVL besar (LINK $20M, PEPE $25M) menghasilkan
+  // whale score rendah bahkan untuk transaksi $49K → selalu LOW risk
+  // → alert TIDAK PERNAH terkirim. Filtering berdasarkan risk level
+  // dilakukan di bot.broadcast() melalui user.riskFilter per-subscriber.
   const riskCategory = getRiskCategory(whaleScore.total, lpImpactPct);
   console.log(`   Risk Category: ${riskCategory}`);
-  
-  // Filter 4: Skip LOW risk
-  if (riskCategory === 'LOW') {
-    console.log(`   ❌ FILTER 4 FAIL: LOW risk not broadcasted`);
-    return null;
-  }
-  console.log(`   ✅ FILTER 4 PASS: Risk level OK (${riskCategory})`);
   
   // Cek cooldown
   const tokenSymbol = swapData.direction === 'BUY' ? swapData.tokenOut : swapData.tokenIn;
