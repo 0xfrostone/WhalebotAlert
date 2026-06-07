@@ -13,7 +13,7 @@ class AlertStore {
   constructor() {
     this.ensureDataDir();
     this.alerts = this.loadAlerts();
-    this.statistics = this.calculateStatistics();
+    this.updateStatistics();
   }
 
   ensureDataDir() {
@@ -151,6 +151,18 @@ class AlertStore {
   }
 
   updateStatistics() {
+    let highestVolume = 0;
+    let highestScore = 0;
+    
+    this.alerts.forEach(a => {
+      if ((a.valueUSD || 0) > highestVolume) highestVolume = a.valueUSD;
+      if ((a.whaleScore || 0) > highestScore) highestScore = a.whaleScore;
+    });
+
+    const avgVolume = this.alerts.length > 0 
+      ? this.calculateTotalVolume() / this.alerts.length 
+      : 0;
+
     const stats = {
       lastUpdated: new Date().toISOString(),
       totalAlerts: this.alerts.length,
@@ -166,7 +178,10 @@ class AlertStore {
       },
       tokenFrequency: this.getTokenFrequency(),
       avgWhaleScore: this.calculateAverageWhaleScore(),
+      highestWhaleScore: highestScore,
       totalVolumeUSD: this.calculateTotalVolume(),
+      avgVolumeUSD: avgVolume,
+      highestVolumeUSD: highestVolume,
       topWallets: this.getTopWallets(5),
     };
     this.statistics = stats;
@@ -181,7 +196,10 @@ class AlertStore {
         alertsByRisk: { EXTREME: 0, HIGH: 0, MEDIUM: 0, LOW: 0 },
         tokenFrequency: {},
         avgWhaleScore: 0,
+        highestWhaleScore: 0,
         totalVolumeUSD: 0,
+        avgVolumeUSD: 0,
+        highestVolumeUSD: 0,
         topWallets: [],
       };
     }

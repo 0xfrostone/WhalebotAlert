@@ -159,50 +159,71 @@ class ResearchHandler {
 
       const sortedTokens = Object.entries(stats.tokenFrequency || {})
         .sort(([, a], [, b]) => b - a)
-        .slice(0, 5);
+        .slice(0, 3);
 
-      const topTokensText = sortedTokens.length > 0
-        ? sortedTokens.map(([token, count]) => `  • $${token}: ${count} alert`).join('\n')
-        : '  Tidak ada data';
+      let topTokensText = '';
+      if (sortedTokens.length > 0) {
+        topTokensText = sortedTokens.map(([token, count], idx) => `${idx + 1}. ${token} (${count})`).join('\n');
+      } else {
+        topTokensText = 'Tidak ada data';
+      }
 
-      const topWalletsText = (stats.topWallets || [])
-        .map(w => `  • ${w.wallet}: ${w.transactionCount} tx`)
-        .join('\n') || '  Tidak ada data';
+      const totalAlerts = stats.totalAlerts || 0;
+      const buyCount = stats.alertsByType?.BUY || 0;
+      const sellCount = stats.alertsByType?.SELL || 0;
+
+      const highestUsd = formatUSD(stats.highestVolumeUSD || 0);
+      const avgUsd = formatUSD(stats.avgVolumeUSD || 0);
+
+      const avgScore = (stats.avgWhaleScore || 0).toFixed(1);
+      const maxScore = stats.highestWhaleScore || 0;
 
       const text = [
-        `📊 <b>STATISTIK SISTEM</b>`,
+        `📈 <b>Statistik Alert</b>`,
         `━━━━━━━━━━━━━━━━━━━━`,
         ``,
-        `<b>📈 TOTAL ACTIVITY</b>`,
-        `Total Alert: <b>${stats.totalAlerts}</b>`,
-        `Total Volume: <b>${formatUSD(stats.totalVolumeUSD)}</b>`,
-        `Avg Score: <b>${stats.avgWhaleScore.toFixed(2)}/100</b>`,
+        `Total Alert:`,
+        `<b>${totalAlerts}</b>`,
         ``,
-        `<b>🎯 BY TYPE</b>`,
-        `BUY: ${stats.alertsByType.BUY} | SELL: ${stats.alertsByType.SELL}`,
+        `BUY:`,
+        `<b>${buyCount}</b>`,
         ``,
-        `<b>⚠️ BY RISK</b>`,
-        `🚨 EXTREME: ${stats.alertsByRisk.EXTREME}`,
-        `⚠️ HIGH: ${stats.alertsByRisk.HIGH}`,
-        `📊 MEDIUM: ${stats.alertsByRisk.MEDIUM}`,
-        `ℹ️ LOW: ${stats.alertsByRisk.LOW}`,
+        `SELL:`,
+        `<b>${sellCount}</b>`,
+        `━━━━━━━━━━━━━━━━━━━━`,
         ``,
-        `<b>🏆 TOP 5 TOKEN</b>`,
+        `<b>Token Teraktif</b>`,
+        ``,
         topTokensText,
         ``,
-        `<b>👛 TOP 5 WALLET</b>`,
-        topWalletsText,
+        `━━━━━━━━━━━━━━━━━━━━`,
         ``,
-        `⏰ Updated: ${new Date(stats.lastUpdated).toLocaleString('id-ID')}`,
+        `<b>Nilai Transaksi</b>`,
+        ``,
+        `Tertinggi:`,
+        `<b>${highestUsd}</b>`,
+        ``,
+        `Rata-rata:`,
+        `<b>${avgUsd}</b>`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        ``,
+        `<b>Whale Score</b>`,
+        ``,
+        `Rata-rata:`,
+        `<b>${avgScore}</b>`,
+        ``,
+        `Tertinggi:`,
+        `<b>${maxScore}</b>`,
+        `━━━━━━━━━━━━━━━━━━━━`
       ].join('\n');
 
       const buttons = [
         [
-          { text: '📜 Riwayat', callback_data: 'research_alerts_list' },
-          { text: '📥 Export', callback_data: 'research_export_csv' }
+          { text: '🔄 Refresh', callback_data: 'research_statistics' },
+          { text: '📤 Export CSV', callback_data: 'research_export_csv' }
         ],
         [
-          { text: '⬅️ Kembali ke Menu', callback_data: 'menu_back' }
+          { text: '⬅️ Kembali', callback_data: 'research_alerts_list' }
         ]
       ];
 
@@ -213,7 +234,12 @@ class ResearchHandler {
         reply_markup: { inline_keyboard: buttons }
       });
     } catch (err) {
-      console.error('Error showing statistics:', err.message);
+      console.error('[STATISTICS ERROR]', err);
+      try {
+        await this.bot.sendMessage(chatId, '❌ Gagal membuka statistik.');
+      } catch (e) {
+        console.error('Failed to send error message:', e);
+      }
     }
   }
 
