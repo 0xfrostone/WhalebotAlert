@@ -37,7 +37,7 @@
     "threshold": 1000,
     "riskFilter": "ALL",
     "active": true,
-    "alertCount": 0,
+    "alertCount": 1,
     "joinedAt": "2026-05-29T11:19:54.468Z",
     "name": "frostTone",
     "updatedAt": "2026-06-07T14:58:06.620Z"
@@ -52,7 +52,7 @@
     "threshold": 10000,
     "riskFilter": "ALL",
     "active": true,
-    "alertCount": 0,
+    "alertCount": 1,
     "joinedAt": "2026-05-29T11:47:12.681Z",
     "name": "Innwerkara",
     "updatedAt": "2026-06-07T14:58:06.630Z"

@@ -45,7 +45,7 @@ class CallbackHandler {
       const alertsToday = user.alertCount || 0;
       return this.editMsg(chatId, msgId,
         `🐋 <b>Whale Intelligence Bot</b>\n\nReal-time Ethereum Whale Monitoring\n\n━━━━━━━━━━━━━━━━━━━━\n\n📡 Status: <b>Online</b>\n👀 Watchlist: <b>${tokenCount} Token</b>\n🔔 Alert Hari Ini: <b>${alertsToday}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\nPilih menu:`,
-        this.menus.buildMainMenu()
+        this.menus.buildMainMenu(user, isAdmin)
       );
     }
 
@@ -53,8 +53,14 @@ class CallbackHandler {
       const stats = this.appBot.getStats();
       const tokenCount = user.tokens ? user.tokens.length : 0;
       const alertsToday = user.alertCount || 0;
+      let extraStats = '';
+      if (isAdmin && this.appBot.researchStore) {
+        const rs = this.appBot.researchStore.getStats();
+        extraStats = `\n\n📈 Whale Terdeteksi: <b>${rs.total_whale_alerts || 0}</b>`;
+      }
+
       return this.editMsg(chatId, msgId,
-        `📊 <b>Dashboard</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n📡 Status Bot: <b>Online</b>\n👥 Subscriber Aktif: <b>${stats.active}</b>\n👀 Token Dipantau: <b>${tokenCount}</b>\n🔔 Alert Hari Hari Ini: <b>${alertsToday}</b>\n\n━━━━━━━━━━━━━━━━━━━━`,
+        `📊 <b>Dashboard</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n📡 Status Bot: <b>Online</b>\n👥 Subscriber Aktif: <b>${stats.active}</b>\n👀 Token Dipantau: <b>${tokenCount}</b>\n🔔 Alert Hari Hari Ini: <b>${alertsToday}</b>${extraStats}\n\n━━━━━━━━━━━━━━━━━━━━`,
         this.menus.buildDashboardMenu(user)
       );
     }
@@ -88,13 +94,96 @@ class CallbackHandler {
       );
     }
 
+    if (data === 'nav_research_stats' || data === 'refresh_research_stats') {
+      if (!isAdmin) return this.bot.answerCallbackQuery(query.id, { text: 'Akses ditolak', show_alert: true });
+      
+      const rs = this.appBot.researchStore.getStats();
+      const startDate = new Date(rs.monitoring_start_date).toLocaleString('id-ID');
+      const lastDate = new Date().toLocaleString('id-ID');
+
+      // Token string builder
+      let tokensStr = '';
+      if (rs.token_stats && Object.keys(rs.token_stats).length > 0) {
+        for (const [sym, stats] of Object.entries(rs.token_stats)) {
+          tokensStr += `\n${sym}:\nBUY ${stats.BUY}\nSELL ${stats.SELL}\n`;
+        }
+      } else {
+        tokensStr = '\nBelum ada data token.\n';
+      }
+
+      const h_token = rs.highest_transaction.token || '-';
+      const h_amount = formatUSD(rs.highest_transaction.amount || 0);
+      const h_time = rs.highest_transaction.timestamp ? new Date(rs.highest_transaction.timestamp).toLocaleString('id-ID') : '-';
+
+      const avg_score = rs.average_score.toFixed(1);
+      const avg_impact = (rs.average_impact * 100).toFixed(5);
+      
+      const uptimeH = ((Date.now() - new Date(rs.monitoring_start_date).getTime()) / 3_600_000).toFixed(1);
+
+      const msgText = `📈 <b>Statistik Penelitian</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n<b>Periode Monitoring</b>\nMulai:\n${startDate}\n\nTerakhir:\n${lastDate}\n\n━━━━━━━━━━━━━━━━━━━━\n\n<b>Aktivitas Whale</b>\n\nTotal Event Masuk:\n<b>${rs.total_events}</b>\n\nTotal Whale Terdeteksi:\n<b>${rs.total_whale_alerts}</b>\n\nTotal Alert Dikirim:\n<b>${rs.total_alerts_sent}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n<b>Aktivitas BUY / SELL</b>\n\nBUY:\n<b>${rs.buy_count}</b>\n\nSELL:\n<b>${rs.sell_count}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n<b>Per Token</b>\n${tokensStr}\n━━━━━━━━━━━━━━━━━━━━\n\n<b>Transaksi Terbesar</b>\n\nToken:\n<b>${h_token}</b>\n\nNilai:\n<b>${h_amount}</b>\n\nWaktu:\n<b>${h_time}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n<b>Metrik Sistem</b>\n\nRata-rata Whale Score:\n<b>${avg_score}</b>\n\nRata-rata Liquidity Impact:\n<b>${avg_impact}%</b>\n\nMonitoring Uptime:\n<b>${uptimeH} jam</b>\n\n━━━━━━━━━━━━━━━━━━━━`;
+
+      return this.editMsg(chatId, msgId, msgText, {
+        inline_keyboard: [
+          [{ text: '🔄 Refresh', callback_data: 'refresh_research_stats' }],
+          [{ text: '📤 Export Data', callback_data: 'export_research_csv' }],
+          [{ text: '⬅️ Kembali', callback_data: 'nav_main' }]
+        ]
+      });
+    }
+
+    if (data === 'export_research_csv') {
+      if (!isAdmin) return this.bot.answerCallbackQuery(query.id, { text: 'Akses ditolak', show_alert: true });
+      
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const ALERTS_FILE = path.join(process.cwd(), 'data', 'alerts.json');
+        
+        if (!fs.existsSync(ALERTS_FILE)) {
+          return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
+        }
+
+        const alerts = JSON.parse(fs.readFileSync(ALERTS_FILE, 'utf8'));
+        if (alerts.length === 0) {
+          return this.bot.sendMessage(chatId, 'Data alert kosong.');
+        }
+
+        let csvContent = 'Timestamp,Token,Action,USD Value,Liquidity Impact (%),Whale Score,Wallet,DEX\n';
+        
+        alerts.forEach(a => {
+          const time = new Date(a.timestamp).toISOString();
+          const token = a.tokenSymbol;
+          const action = a.direction;
+          const usd = (a.usdValue || 0).toFixed(2);
+          const impact = (a.liquidityImpact * 100).toFixed(5);
+          const score = a.whaleScore.total;
+          const wallet = a.wallet;
+          const dex = a.pool ? a.pool.dex : '-';
+          
+          csvContent += `${time},${token},${action},${usd},${impact},${score},${wallet},${dex}\n`;
+        });
+
+        const csvPath = path.join(process.cwd(), 'data', 'research_export.csv');
+        fs.writeFileSync(csvPath, csvContent);
+
+        await this.bot.sendDocument(chatId, csvPath, {
+          caption: '📊 Export Data Penelitian (CSV)\n\nSilakan gunakan file ini untuk analisis bab 4.',
+        });
+        
+        return this.bot.answerCallbackQuery(query.id, { text: 'File CSV berhasil dikirim!', show_alert: false });
+      } catch (err) {
+        console.error('Export CSV error:', err);
+        return this.bot.sendMessage(chatId, `❌ Gagal export data: ${err.message}`);
+      }
+    }
+
     // ——— BACK COMPATIBILITY ———
     if (data === 'menu_back') {
       const tokenCount = user.tokens ? user.tokens.length : 0;
       const alertsToday = user.alertCount || 0;
       return this.editMsg(chatId, msgId,
         `🐋 <b>Whale Intelligence Bot</b>\n\nReal-time Ethereum Whale Monitoring\n\n━━━━━━━━━━━━━━━━━━━━\n\n📡 Status: <b>Online</b>\n👀 Watchlist: <b>${tokenCount} Token</b>\n🔔 Alert Hari Ini: <b>${alertsToday}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\nPilih menu:`,
-        this.menus.buildMainMenu()
+        this.menus.buildMainMenu(user, isAdmin)
       );
     }
 

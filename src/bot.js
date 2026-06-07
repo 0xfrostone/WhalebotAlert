@@ -72,6 +72,10 @@ class InteractiveWhaleBot {
     this.listener = listener;
   }
 
+  setResearchStore(researchStore) {
+    this.researchStore = researchStore;
+  }
+
   setupCommands() {
     setupStartCommand(this.bot, this.watchlistStore);
     setupStopCommand(this.bot, this.watchlistStore);
@@ -166,19 +170,28 @@ class InteractiveWhaleBot {
     researchHandler.setup();
   }
 
-  buildMainMenu() {
-    return {
-      inline_keyboard: [
-        [
-          { text: '📊 Dashboard', callback_data: 'nav_dashboard' }
-        ],
-        [
-          { text: '⚙️ Pengaturan', callback_data: 'nav_settings' }
-        ],
-        [
-          { text: '❓ Bantuan', callback_data: 'nav_help' }
-        ]
+  buildMainMenu(user, isAdmin = false) {
+    const buttons = [
+      [
+        { text: '📊 Dashboard', callback_data: 'nav_dashboard' }
+      ],
+      [
+        { text: '⚙️ Pengaturan', callback_data: 'nav_settings' }
       ]
+    ];
+
+    if (isAdmin) {
+      buttons.push([
+        { text: '📈 Statistik Penelitian', callback_data: 'nav_research_stats' }
+      ]);
+    }
+
+    buttons.push([
+      { text: '❓ Bantuan', callback_data: 'nav_help' }
+    ]);
+
+    return {
+      inline_keyboard: buttons
     };
   }
 

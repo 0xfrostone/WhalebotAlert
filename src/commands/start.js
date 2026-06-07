@@ -39,7 +39,7 @@ function setupStartCommand(bot, watchlistStore) {
 
     await bot.sendMessage(chatId, text, {
       parse_mode: 'HTML',
-      reply_markup: global.botMenus.buildMainMenu()
+      reply_markup: global.botMenus.buildMainMenu(user, isAdmin)
     });
   });
 }

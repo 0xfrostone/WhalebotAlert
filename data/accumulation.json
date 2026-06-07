@@ -1,0 +1,14 @@
+{
+  "0xbdb3ba9ffe392549e1f8658dd2630c141fdf47b6_LINK": {
+    "wallet": "0xbdb3ba9ffe392549e1f8658dd2630c141fdf47b6",
+    "token": "LINK",
+    "direction": "BUY",
+    "transactions": [
+      {
+        "timestamp": 1780852033123,
+        "usdValue": 16778.19946162302,
+        "impactPct": 0.0008389099730811509
+      }
+    ]
+  }
+}

@@ -124,6 +124,11 @@ async function main() {
   // Inisialisasi alert logger untuk research
   const alertLogger = new AlertLogger();
 
+  // Inisialisasi ResearchStore
+  const { ResearchStore } = require('./src/storage/researchStore');
+  const researchStore = new ResearchStore();
+  bot.setResearchStore(researchStore);
+
   // Tampilkan link bot
   try {
     const me = await bot.bot.getMe();
@@ -151,6 +156,8 @@ async function main() {
   // ============================================================
   async function onSwapDetected(swapData) {
     stats.totalEvents++;
+    researchStore.incrementEvents();
+    
     const tokenName = swapData.direction === 'BUY' ? swapData.tokenOut : swapData.tokenIn;
     console.log(`\n📡 [EVENT #${stats.totalEvents}] ${tokenName} ${swapData.direction} from listener`);
     console.log(`   amountIn=${swapData.amountIn} ${swapData.tokenIn} | amountOut=${swapData.amountOut} ${swapData.tokenOut}`);
@@ -179,10 +186,12 @@ async function main() {
         console.log(`🚀 Mengirim Whale Alert ke bot...`);
         const sentCount = await bot.broadcast(result);
         console.log(`✅ Alert berhasil dikirim ke ${sentCount} user(s)`);
+        researchStore.addAlertsSent(sentCount);
 
         // Simpan alert
         saveAlert(result);
         alertLogger.logAlert(result);
+        researchStore.recordWhale(swapData, result);
         
         // --- 2. ACCUMULATION DETECTION ---
         const accumulationEvent = accumulationTracker.processSwap(result);
