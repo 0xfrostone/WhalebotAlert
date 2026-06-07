@@ -10,8 +10,9 @@ const { logAdmin } = require('../utils/logger');
 const { formatUSD } = require('../utils/formatter');
 
 class CallbackHandler {
-  constructor(bot, watchlistStore, maintenanceService, botMenus) {
-    this.bot = bot;
+  constructor(telegramBot, watchlistStore, maintenanceService, botMenus, appBot) {
+    this.bot = telegramBot;
+    this.appBot = appBot;
     this.subscribers = watchlistStore;
     this.maintenance = maintenanceService;
     this.menus = botMenus;
@@ -50,11 +51,11 @@ class CallbackHandler {
     }
 
     if (data === 'nav_dashboard') {
-      const stats = this.bot.getStats();
+      const stats = this.appBot.getStats();
       const tokenCount = user.tokens ? user.tokens.length : 0;
       const alertsToday = user.alertCount || 0;
       return this.editMsg(chatId, msgId,
-        `📊 <b>Dashboard</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n📡 Status Bot: <b>Online</b>\n👥 Subscriber Aktif: <b>${stats.active}</b>\n👀 Token Dipantau: <b>${tokenCount}</b>\n🔔 Alert Hari Ini: <b>${alertsToday}</b>\n\n━━━━━━━━━━━━━━━━━━━━`,
+        `📊 <b>Dashboard</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n📡 Status Bot: <b>Online</b>\n👥 Subscriber Aktif: <b>${stats.active}</b>\n👀 Token Dipantau: <b>${tokenCount}</b>\n🔔 Alert Hari Hari Ini: <b>${alertsToday}</b>\n\n━━━━━━━━━━━━━━━━━━━━`,
         this.menus.buildDashboardMenu(user)
       );
     }
@@ -106,13 +107,59 @@ class CallbackHandler {
     }
 
     // ——— MENU ITEMS ———
-    if (data === 'menu_add_token' || data === 'menu_remove_token' || data === 'menu_token') {
-      const tokensArr = user.tokens || [];
-      const sel = tokensArr.length ? tokensArr.map(t => `$${t}`).join(', ') : 'Belum ada';
+    if (data === 'menu_add_token') {
+      console.log(`[WATCHLIST] Add Token Requested by ${user.name} (${chatId})`);
+      this.appBot.userStates.set(chatId, 'AWAITING_CONTRACT');
       return this.editMsg(chatId, msgId,
-        `🎯 <b>Pilih Token yang Dipantau</b>\n\nToken aktif: <b>${sel}</b>\n\nCentang/hapus centang token:`,
-        TokenHandler.buildMenu(user)
+        `➕ <b>Tambah Token</b>\n\nMasukkan Contract Address ERC-20 Ethereum yang ingin dipantau.\n\nContoh:\n<code>0x514910771AF9Ca656af840dff83E8264EcF986CA</code>\n\nKetik alamat contract atau tekan Batal.`,
+        {
+          inline_keyboard: [[{ text: '❌ Batal', callback_data: 'menu_cancel_add' }]]
+        }
       );
+    }
+
+    if (data === 'menu_cancel_add') {
+      this.appBot.userStates.delete(chatId);
+      return this.editMsg(chatId, msgId,
+        `👀 <b>Watchlist Menu</b>\n\nKelola token yang sedang dipantau.`,
+        this.menus.buildWatchlistMenu()
+      );
+    }
+
+    if (data === 'menu_remove_token') {
+      const tokensArr = user.tokens || [];
+      if (tokensArr.length === 0) {
+        return this.bot.answerCallbackQuery(query.id, { text: 'Watchlist kosong!', show_alert: true });
+      }
+
+      const keyboard = tokensArr.map(t => [{ text: `❌ ${t}`, callback_data: `remove_token_${t}` }]);
+      keyboard.push([{ text: '⬅️ Kembali', callback_data: 'nav_watchlist' }]);
+
+      return this.editMsg(chatId, msgId,
+        `➖ <b>Hapus Token</b>\n\nPilih token yang ingin dihapus dari watchlist:`,
+        { inline_keyboard: keyboard }
+      );
+    }
+
+    if (data.startsWith('remove_token_')) {
+      const tokenSymbol = data.replace('remove_token_', '');
+      console.log(`[WATCHLIST] Token Removed: ${tokenSymbol} by ${user.name} (${chatId})`);
+      if (user.tokens) {
+        user.tokens = user.tokens.filter(t => t !== tokenSymbol);
+        this.subscribers.set(chatId, user);
+      }
+      return this.bot.answerCallbackQuery(query.id, { text: `✅ Token ${tokenSymbol} berhasil dihapus.`, show_alert: true })
+        .then(() => {
+          // Re-render the remove menu
+          const tokensArr = user.tokens || [];
+          const keyboard = tokensArr.map(t => [{ text: `❌ ${t}`, callback_data: `remove_token_${t}` }]);
+          keyboard.push([{ text: '⬅️ Kembali', callback_data: 'nav_watchlist' }]);
+          
+          return this.editMsg(chatId, msgId,
+            `➖ <b>Hapus Token</b>\n\nPilih token yang ingin dihapus dari watchlist:`,
+            { inline_keyboard: keyboard }
+          );
+        });
     }
 
     if (data === 'menu_my_watchlist') {
@@ -147,43 +194,7 @@ class CallbackHandler {
       return this.handleHelp(chatId, msgId);
     }
 
-    // ——— TOKEN HANDLERS ———
-    if (data.startsWith('token_toggle_')) {
-      const token = data.replace('token_toggle_', '');
-      TokenHandler.handleToggle(user, token);
-      this.subscribers.set(chatId, user);
-      return this.bot.editMessageReplyMarkup(
-        TokenHandler.buildMenu(user),
-        { chat_id: chatId, message_id: msgId }
-      ).catch(() => {});
-    }
 
-    if (data === 'token_all') {
-      TokenHandler.handleSelectAll(user);
-      this.subscribers.set(chatId, user);
-      return this.bot.editMessageReplyMarkup(
-        TokenHandler.buildMenu(user),
-        { chat_id: chatId, message_id: msgId }
-      ).catch(() => {});
-    }
-
-    if (data === 'token_none') {
-      TokenHandler.handleSelectNone(user);
-      this.subscribers.set(chatId, user);
-      return this.bot.editMessageReplyMarkup(
-        TokenHandler.buildMenu(user),
-        { chat_id: chatId, message_id: msgId }
-      ).catch(() => {});
-    }
-
-    if (data === 'token_confirm') {
-      const sel = TokenHandler.getSelectedText(user);
-      this.subscribers.set(chatId, user);
-      return this.editMsg(chatId, msgId,
-        `✅ <b>Token Tersimpan!</b>\n\nMemantau: ${sel}\n\nKembali ke menu watchlist:`,
-        this.menus.buildWatchlistMenu(user)
-      );
-    }
 
     // ——— THRESHOLD HANDLERS ———
     if (data.startsWith('thr_') && data !== 'thr_confirm') {
@@ -235,7 +246,7 @@ class CallbackHandler {
       user.active = true;
       this.subscribers.set(chatId, user);
 
-      const stats = this.bot.getStats();
+      const stats = this.appBot.getStats();
       const tokenCount = tokensArr.length;
       const alertsToday = user.alertCount || 0;
 
@@ -249,7 +260,7 @@ class CallbackHandler {
       user.active = false;
       this.subscribers.set(chatId, user);
       
-      const stats = this.bot.getStats();
+      const stats = this.appBot.getStats();
       const tokenCount = user.tokens ? user.tokens.length : 0;
       const alertsToday = user.alertCount || 0;
 

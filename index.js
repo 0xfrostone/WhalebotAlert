@@ -205,6 +205,12 @@ async function main() {
   // START BLOCKCHAIN LISTENER
   // ============================================================
   const listener = new BlockchainListener(process.env.ALCHEMY_WSS_URL, onSwapDetected);
+  
+  const { TokenService } = require('./src/services/tokenService');
+  const tokenService = new TokenService(process.env.ALCHEMY_WSS_URL, listener.tokenStore);
+  bot.setTokenService(tokenService);
+  bot.setListener(listener);
+
   await listener.start();
 
   // ============================================================

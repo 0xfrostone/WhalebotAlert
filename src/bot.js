@@ -53,6 +53,9 @@ class InteractiveWhaleBot {
       buildHelpMenu: this.buildHelpMenu.bind(this)
     };
 
+    // User states for conversational inputs
+    this.userStates = new Map();
+
     this.setupCommands();
     this.setupCallbackHandler();
     this.setupResearchHandler();
@@ -61,6 +64,14 @@ class InteractiveWhaleBot {
     if (this.maintenanceService.isActive()) {
       console.log(`⚠️ MAINTENANCE MODE AKTIF — ${this.maintenanceService.getState().reason}`);
     }
+  }
+
+  setTokenService(tokenService) {
+    this.tokenService = tokenService;
+  }
+
+  setListener(listener) {
+    this.listener = listener;
   }
 
   setupCommands() {
@@ -72,6 +83,67 @@ class InteractiveWhaleBot {
     setupResearchCommand(this.bot);
     setupTestAlertCommand(this.bot, this.watchlistStore);
     console.log('🧪 /testalert command registered (temporary debug command)');
+
+    // Catch-all message handler for conversational state (e.g. AWAITING_CONTRACT)
+    this.bot.on('message', async (msg) => {
+      if (!msg.text || msg.text.startsWith('/')) return;
+
+      const chatId = msg.chat.id;
+      const state = this.userStates.get(chatId);
+
+      if (state === 'AWAITING_CONTRACT') {
+        const text = msg.text.trim();
+        this.userStates.delete(chatId); // clear state immediately
+
+        const waitMsg = await this.bot.sendMessage(chatId, `⏳ Sedang memvalidasi kontrak ${text}...`);
+
+        try {
+          // Validate and fetch on-chain data
+          console.log(`[WATCHLIST] Contract Validated: ${text}`);
+          const tokenData = await this.tokenService.validateAndAddToken(text);
+          
+          // Add to system listener dynamically
+          this.listener.addNewToken(tokenData);
+
+          // Add to user's watchlist
+          const user = this.watchlistStore.get(chatId);
+          if (!user.tokens) user.tokens = [];
+          if (!user.tokens.includes(tokenData.symbol)) {
+            user.tokens.push(tokenData.symbol);
+            this.watchlistStore.set(chatId, user);
+          }
+          
+          console.log(`[WATCHLIST] Token Added: ${tokenData.symbol} by ${chatId}`);
+
+          await this.bot.editMessageText(
+            `✅ <b>Token Berhasil Ditambahkan</b>\n\nNama:\n${tokenData.symbol}\n\nSymbol:\n${tokenData.symbol}\n\nWatchlist Saat Ini:\n${user.tokens.length} Token`,
+            {
+              chat_id: chatId,
+              message_id: waitMsg.message_id,
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [[{ text: '⬅️ Kembali', callback_data: 'nav_watchlist' }]]
+              }
+            }
+          );
+        } catch (err) {
+          await this.bot.editMessageText(
+            `❌ <b>Gagal Menambahkan Token</b>\n\nAlasan: ${err.message}\n\nPastikan alamat kontrak ERC-20 valid.`,
+            {
+              chat_id: chatId,
+              message_id: waitMsg.message_id,
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '🔄 Coba Lagi', callback_data: 'menu_add_token' }],
+                  [{ text: '⬅️ Kembali', callback_data: 'nav_watchlist' }]
+                ]
+              }
+            }
+          );
+        }
+      }
+    });
   }
 
   setupCallbackHandler() {
@@ -79,7 +151,8 @@ class InteractiveWhaleBot {
       this.bot,
       this.watchlistStore,
       this.maintenanceService,
-      global.botMenus
+      global.botMenus,
+      this // Pass the InteractiveWhaleBot instance itself to access getStats()
     );
     callbackHandler.setup();
   }
