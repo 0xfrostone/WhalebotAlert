@@ -1,6 +1,7 @@
 // src/handlers/researchHandler.js
 // Handler untuk research menu callbacks (Riwayat Alert & Statistik)
 
+const fs = require('fs');
 const { AlertLogger } = require('../services/alertLogger');
 const { CSVExporter } = require('../utils/csvExporter');
 const { formatUSD } = require('../utils/formatter');
@@ -256,16 +257,10 @@ class ResearchHandler {
       const csv = CSVExporter.alertsToCSV(recentAlerts);
 
       // Save to temporary file
-      const fs = require('fs');
-      const path = require('path');
+      const StorageManager = require('../storage/StorageManager');
       const timestamp = new Date().toISOString().split('T')[0];
       const fileName = `whale_alerts_export_${timestamp}.csv`;
-      const filePath = path.join(process.cwd(), 'data', 'exports', fileName);
-
-      const exportDir = path.dirname(filePath);
-      if (!fs.existsSync(exportDir)) {
-        fs.mkdirSync(exportDir, { recursive: true });
-      }
+      const filePath = StorageManager.getExportsPath(fileName);
 
       fs.writeFileSync(filePath, csv, 'utf8');
 

@@ -61,18 +61,13 @@ class CSVExporter {
   }
 
   static exportToFile(alerts, fileName = null) {
+    const StorageManager = require('../storage/StorageManager');
     const timestamp = new Date().toISOString().split('T')[0];
     const fileName_ = fileName || `whale_alerts_research_${timestamp}.csv`;
-    const filePath = path.join(process.cwd(), 'data', 'exports', fileName_);
-
-    // Ensure exports directory exists
-    const exportDir = path.dirname(filePath);
-    if (!fs.existsSync(exportDir)) {
-      fs.mkdirSync(exportDir, { recursive: true });
-    }
+    const filePath = StorageManager.getExportsPath(fileName_);
 
     const csvContent = this.alertsToCSV(alerts);
-    fs.writeFileSync(filePath, csvContent, 'utf8');
+    require('fs').writeFileSync(filePath, csvContent, 'utf8');
 
     return filePath;
   }
@@ -208,16 +203,12 @@ class CSVExporter {
   }
 
   static saveReport(reportData, fileName = null) {
+    const StorageManager = require('../storage/StorageManager');
     const timestamp = new Date().toISOString().split('T')[0];
     const fileName_ = fileName || `research_report_${timestamp}.json`;
-    const filePath = path.join(process.cwd(), 'data', 'exports', fileName_);
+    const filePath = StorageManager.getExportsPath(fileName_);
 
-    const exportDir = path.dirname(filePath);
-    if (!fs.existsSync(exportDir)) {
-      fs.mkdirSync(exportDir, { recursive: true });
-    }
-
-    fs.writeFileSync(filePath, JSON.stringify(reportData, null, 2), 'utf8');
+    require('fs').writeFileSync(filePath, JSON.stringify(reportData, null, 2), 'utf8');
     return filePath;
   }
 }

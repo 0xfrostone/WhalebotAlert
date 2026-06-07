@@ -1,0 +1,92 @@
+// src/storage/StorageManager.js
+const fs = require('fs');
+const path = require('path');
+
+const STORAGE_DIR = path.join(process.cwd(), 'storage');
+
+class StorageManager {
+  static ensureDir(dirPath) {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+  }
+
+  static getFilePath(filename) {
+    this.ensureDir(STORAGE_DIR);
+    return path.join(STORAGE_DIR, filename);
+  }
+
+  static readJSON(filename, defaultData = null) {
+    const filePath = this.getFilePath(filename);
+    if (!fs.existsSync(filePath)) {
+      return defaultData;
+    }
+    try {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch (err) {
+      console.error(`[StorageManager] Error reading ${filename}:`, err.message);
+      return defaultData;
+    }
+  }
+
+  static writeJSON(filename, data) {
+    const filePath = this.getFilePath(filename);
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+      return true;
+    } catch (err) {
+      console.error(`[StorageManager] Error writing ${filename}:`, err.message);
+      return false;
+    }
+  }
+
+  static getExportsPath(filename) {
+    const exportsDir = path.join(STORAGE_DIR, 'exports');
+    this.ensureDir(exportsDir);
+    return path.join(exportsDir, filename);
+  }
+
+  static getResearchPath(filename) {
+    const researchDir = path.join(STORAGE_DIR, 'research');
+    this.ensureDir(researchDir);
+    return path.join(researchDir, filename);
+  }
+
+  static getBackupsPath(filename) {
+    const backupsDir = path.join(STORAGE_DIR, 'backups');
+    this.ensureDir(backupsDir);
+    return path.join(backupsDir, filename);
+  }
+
+  // --- Specific Helpers for Phase 1 ---
+
+  static loadSubscribers() {
+    return this.readJSON('subscribers.json', {});
+  }
+  static saveSubscribers(data) {
+    this.writeJSON('subscribers.json', data);
+  }
+
+  static loadWatchlists() {
+    return this.readJSON('watchlists.json', {});
+  }
+  static saveWatchlists(data) {
+    this.writeJSON('watchlists.json', data);
+  }
+
+  static loadTokens() {
+    return this.readJSON('tokens.json', {});
+  }
+  static saveTokens(data) {
+    this.writeJSON('tokens.json', data);
+  }
+
+  static loadAlerts() {
+    return this.readJSON('alerts.json', []);
+  }
+  static saveAlerts(data) {
+    this.writeJSON('alerts.json', data);
+  }
+}
+
+module.exports = StorageManager;

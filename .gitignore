@@ -1,0 +1,21 @@
+# Node modules
+node_modules/
+npm-debug.log
+
+# Environment variables
+.env
+.env.local
+
+# Storage (Git Conflict Prevention - Phase 5)
+storage/backups/
+storage/exports/
+storage/research/
+storage/alerts.csv
+storage/alerts.json
+storage/accumulation.json
+storage/maintenance.json
+storage/research_stats.json
+logs/
+
+# Note: We temporarily do NOT ignore subscribers.json, watchlists.json, and tokens.json 
+# in storage/ as per the prompt instructions (Phase 5 - implement gradually after verification).

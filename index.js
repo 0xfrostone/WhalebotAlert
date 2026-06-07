@@ -8,50 +8,25 @@ const { analyzeSwap }          = require('./src/blockchain/detector');
 const { InteractiveWhaleBot }  = require('./src/bot');
 const { AlertLogger }          = require('./src/services/alertLogger');
 const { AccumulationTracker }  = require('./src/blockchain/accumulationTracker');
+const { BackupService }        = require('./src/services/backupService');
 
 // ============================================================
 // UTILITAS: Simpan alert dan statistik wallet
 // ============================================================
-const fs = require('fs');
-const path = require('path');
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const ALERTS_FILE = path.join(DATA_DIR, 'alerts.json');
-const WALLETS_FILE = path.join(DATA_DIR, 'wallets.json');
-
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-}
-
-function loadJSON(filePath) {
-  if (!fs.existsSync(filePath)) return [];
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch {
-    return [];
-  }
-}
-
-function saveJSON(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-}
+const StorageManager = require('./src/storage/StorageManager');
 
 function saveAlert(alertData) {
-  ensureDataDir();
-  const alerts = loadJSON(ALERTS_FILE);
+  const alerts = StorageManager.readJSON('alerts.json', []);
   alerts.unshift({
     ...alertData,
     savedAt: new Date().toISOString()
   });
   if (alerts.length > 1000) alerts.splice(1000);
-  saveJSON(ALERTS_FILE, alerts);
+  StorageManager.writeJSON('alerts.json', alerts);
 }
 
 function updateWalletStats(address, txData) {
-  ensureDataDir();
-  const wallets = loadJSON(WALLETS_FILE);
+  const wallets = StorageManager.readJSON('wallets.json', []);
   const existing = wallets.find(w => w.address === address);
   
   if (existing) {
@@ -69,7 +44,7 @@ function updateWalletStats(address, txData) {
   }
   
   if (wallets.length > 500) wallets.splice(500);
-  saveJSON(WALLETS_FILE, wallets);
+  StorageManager.writeJSON('wallets.json', wallets);
 }
 
 // ============================================================
@@ -121,7 +96,11 @@ async function main() {
   // Inisialisasi bot interaktif
   const bot = new InteractiveWhaleBot(process.env.TELEGRAM_BOT_TOKEN);
 
-  // Inisialisasi alert logger untuk research
+  // Inisialisasi sistem Backup
+  const backupService = new BackupService();
+  backupService.startCron();
+
+  // Inisialisasi Alert Logger
   const alertLogger = new AlertLogger();
 
   // Inisialisasi ResearchStore

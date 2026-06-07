@@ -1,6 +1,8 @@
 // src/handlers/callbackHandler.js
 // Main callback handler untuk semua inline buttons
 
+const fs = require('fs');
+const path = require('path');
 const { TokenHandler } = require('./tokenHandler');
 const { ThresholdHandler } = require('./thresholdHandler');
 const { ChartHandler } = require('./chartHandler');
@@ -147,17 +149,11 @@ class CallbackHandler {
       if (!isAdmin) return this.bot.answerCallbackQuery(query.id, { text: 'Akses ditolak', show_alert: true });
       
       try {
-        const fs = require('fs');
-        const path = require('path');
-        const ALERTS_FILE = path.join(process.cwd(), 'data', 'alerts.json');
+        const StorageManager = require('../storage/StorageManager');
+        const alerts = StorageManager.readJSON('alerts.json', []);
         
-        if (!fs.existsSync(ALERTS_FILE)) {
-          return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
-        }
-
-        const alerts = JSON.parse(fs.readFileSync(ALERTS_FILE, 'utf8'));
         if (alerts.length === 0) {
-          return this.bot.sendMessage(chatId, 'Data alert kosong.');
+          return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
         }
 
         let csvContent = 'No,Date,Time,Token,Action,Transaction Value (USD),Token Amount,Whale Score,Liquidity Impact (%),DEX,Wallet Address,Transaction Hash\n';
@@ -193,7 +189,7 @@ class CallbackHandler {
 
         const today = new Date().toISOString().split('T')[0];
         const filename = `whale_research_dataset_${today}.csv`;
-        const csvPath = path.join(process.cwd(), 'data', filename);
+        const csvPath = StorageManager.getResearchPath(filename);
         fs.writeFileSync(csvPath, csvContent, 'utf8');
 
         await this.bot.sendDocument(chatId, csvPath, {
@@ -212,15 +208,8 @@ class CallbackHandler {
       if (!isAdmin) return this.bot.answerCallbackQuery(query.id, { text: 'Akses ditolak', show_alert: true });
       
       try {
-        const fs = require('fs');
-        const path = require('path');
         const rs = this.appBot.researchStore.getStats();
-        const ALERTS_FILE = path.join(process.cwd(), 'data', 'alerts.json');
-        
-        let alerts = [];
-        if (fs.existsSync(ALERTS_FILE)) {
-          alerts = JSON.parse(fs.readFileSync(ALERTS_FILE, 'utf8'));
-        }
+        const alerts = StorageManager.readJSON('alerts.json', []);
 
         const startDate = new Date(rs.monitoring_start_date).toLocaleString('id-ID');
         const lastDate = new Date().toLocaleString('id-ID');
@@ -296,7 +285,7 @@ class CallbackHandler {
 
         const today = new Date().toISOString().split('T')[0];
         const filename = `whale_research_summary_${today}.csv`;
-        const csvPath = path.join(process.cwd(), 'data', filename);
+        const csvPath = StorageManager.getResearchPath(filename);
         fs.writeFileSync(csvPath, csvContent, 'utf8');
 
         await this.bot.sendDocument(chatId, csvPath, {
