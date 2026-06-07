@@ -39,11 +39,69 @@ class CallbackHandler {
     // Acknowledge tombol
     this.bot.answerCallbackQuery(query.id).catch(() => {});
 
-    // ——— NAVIGASI ———
-    if (data === 'menu_back') {
+    // ——— NEW UI NAVIGATION ROUTES ———
+    if (data === 'nav_main') {
+      const tokenCount = user.tokens ? user.tokens.length : 0;
+      const alertsToday = user.alertCount || 0;
       return this.editMsg(chatId, msgId,
-        '🐳 <b>Menu Utama</b>\nPilih opsi di bawah:',
-        this.menus.buildMainMenu(user, this.maintenance)
+        `🐋 <b>Whale Intelligence Bot</b>\nReal-time Ethereum Whale Monitoring\n━━━━━━━━━━━━━━\n📡 Status: <b>Online</b>\n👀 Watchlist: <b>${tokenCount} Tokens</b>\n🔔 Alerts Today: <b>${alertsToday}</b>\n━━━━━━━━━━━━━━\nChoose an option:`,
+        this.menus.buildMainMenu()
+      );
+    }
+
+    if (data === 'nav_dashboard') {
+      const stats = this.bot.getStats();
+      const tokenCount = user.tokens ? user.tokens.length : 0;
+      const alertsToday = user.alertCount || 0;
+      return this.editMsg(chatId, msgId,
+        `📊 <b>Dashboard</b>\n━━━━━━━━━━━━━━\n📡 Bot Status: <b>Online</b>\n👥 Subscribers: <b>${stats.active}</b>\n👀 Tracked Tokens: <b>${tokenCount}</b>\n🚨 Alerts Today: <b>${alertsToday}</b>\n━━━━━━━━━━━━━━`,
+        this.menus.buildDashboardMenu(user)
+      );
+    }
+
+    if (data === 'nav_settings') {
+      return this.editMsg(chatId, msgId,
+        `⚙️ <b>Settings</b>\n\nConfigure your whale monitoring preferences.`,
+        this.menus.buildSettingsMenu()
+      );
+    }
+
+    if (data === 'nav_watchlist') {
+      return this.editMsg(chatId, msgId,
+        `👀 <b>Watchlist Menu</b>\n\nManage the tokens you are currently tracking.`,
+        this.menus.buildWatchlistMenu()
+      );
+    }
+
+    if (data === 'nav_threshold') {
+      return this.editMsg(chatId, msgId,
+        `🎯 <b>Threshold Settings</b>\n\nCurrent Minimum USD: <b>${formatUSD(user.threshold || 0)}</b>`,
+        this.menus.buildThresholdMenu()
+      );
+    }
+
+    if (data === 'nav_risk') {
+      const labels = { ALL: 'Conservative', HIGH_EXTREME: 'Balanced', EXTREME_ONLY: 'Aggressive' };
+      return this.editMsg(chatId, msgId,
+        `⚠️ <b>Risk Filter</b>\n\nCurrent Risk Level: <b>${labels[user.riskFilter || 'ALL']}</b>\n\nChoose the minimum risk alert level to receive:`,
+        this.menus.buildRiskFilterMenu()
+      );
+    }
+
+    if (data === 'nav_help') {
+      return this.editMsg(chatId, msgId,
+        `❓ <b>Help & Documentation</b>\n\n<b>Purpose:</b>\nMonitors Ethereum DEX liquidity pools for whale transactions and tracks accumulation patterns.\n\n<b>Whale Detection:</b>\nEvaluates USD volume and Liquidity Impact percentage to determine on-chain market effects.\n\n<b>Contact:</b>\nSystem Administrator`,
+        this.menus.buildHelpMenu()
+      );
+    }
+
+    // ——— BACK COMPATIBILITY ———
+    if (data === 'menu_back') {
+      const tokenCount = user.tokens ? user.tokens.length : 0;
+      const alertsToday = user.alertCount || 0;
+      return this.editMsg(chatId, msgId,
+        `🐋 <b>Whale Intelligence Bot</b>\nReal-time Ethereum Whale Monitoring\n━━━━━━━━━━━━━━\n📡 Status: <b>Online</b>\n👀 Watchlist: <b>${tokenCount} Tokens</b>\n🔔 Alerts Today: <b>${alertsToday}</b>\n━━━━━━━━━━━━━━\nChoose an option:`,
+        this.menus.buildMainMenu()
       );
     }
 
@@ -157,41 +215,37 @@ class CallbackHandler {
 
     // ——— TRACKING HANDLERS ———
     if (data === 'tracking_start') {
-      if (user.tokens.size === 0) {
+      const tokensArr = user.tokens || [];
+      if (tokensArr.length === 0) {
         return this.bot.answerCallbackQuery(query.id, {
-          text: '⚠️ Pilih minimal 1 token dulu!',
+          text: '⚠️ Please add at least 1 token to your watchlist first!',
           show_alert: true
         });
       }
       user.active = true;
       this.subscribers.set(chatId, user);
 
-      const tokenList = [...user.tokens].map(t => `• <b>$${t}</b>`).join('\n');
-      const riskLabels = { ALL: 'Semua level', HIGH_EXTREME: 'HIGH & EXTREME', EXTREME_ONLY: 'EXTREME saja' };
+      const stats = this.bot.getStats();
+      const tokenCount = tokensArr.length;
+      const alertsToday = user.alertCount || 0;
 
       return this.editMsg(chatId, msgId,
-        [
-          `🟢 <b>Tracking AKTIF!</b>`,
-          ``,
-          `Kamu akan menerima alert untuk:`,
-          tokenList,
-          ``,
-          `⚙️ Minimum nilai: <b>${formatUSD(user.threshold)}</b>`,
-          `🔔 Filter risiko: <b>${riskLabels[user.riskFilter]}</b>`,
-          ``,
-          `Alert datang otomatis saat whale terdeteksi.`,
-          `Tekan Stop kapanpun untuk jeda.`
-        ].join('\n'),
-        this.menus.buildMainMenu(user, this.maintenance)
+        `📊 <b>Dashboard</b>\n━━━━━━━━━━━━━━\n📡 Bot Status: <b>Online</b>\n👥 Subscribers: <b>${stats.active}</b>\n👀 Tracked Tokens: <b>${tokenCount}</b>\n🚨 Alerts Today: <b>${alertsToday}</b>\n━━━━━━━━━━━━━━\n\n✅ <b>Tracking is now ACTIVE</b>. You will receive real-time whale alerts.`,
+        this.menus.buildDashboardMenu(user)
       );
     }
 
     if (data === 'tracking_stop') {
       user.active = false;
       this.subscribers.set(chatId, user);
+      
+      const stats = this.bot.getStats();
+      const tokenCount = user.tokens ? user.tokens.length : 0;
+      const alertsToday = user.alertCount || 0;
+
       return this.editMsg(chatId, msgId,
-        `⏹️ <b>Tracking Dihentikan</b>\n\nKamu tidak akan menerima alert untuk sementara.\n\nTekan "Mulai Tracking" kapanpun untuk melanjutkan.`,
-        this.menus.buildMainMenu(user, this.maintenance)
+        `📊 <b>Dashboard</b>\n━━━━━━━━━━━━━━\n📡 Bot Status: <b>Online</b>\n👥 Subscribers: <b>${stats.active}</b>\n👀 Tracked Tokens: <b>${tokenCount}</b>\n🚨 Alerts Today: <b>${alertsToday}</b>\n━━━━━━━━━━━━━━\n\n⏸ <b>Tracking is PAUSED</b>. Alerts will not be sent until you start tracking again.`,
+        this.menus.buildDashboardMenu(user)
       );
     }
 

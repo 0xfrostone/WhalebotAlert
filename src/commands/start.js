@@ -24,23 +24,23 @@ function setupStartCommand(bot, watchlistStore) {
     user.active = false;
     watchlistStore.set(chatId, user);
 
+    const tokenCount = user.tokens ? user.tokens.length : 0;
+    const alertsToday = user.alertCount || 0;
+
     const text = [
-      `🐳 <b>Whale Intelligence Bot</b>`,
-      `<i>Real-time ERC-20 Whale Detector</i>`,
-      ``,
-      `Halo, <b>${user.name}!</b> 👋`,
-      ``,
-      `Bot ini memantau pergerakan whale secara real-time:`,
-      `💎 <b>$UNI</b> — Uniswap Governance Token`,
-      `🔗 <b>$LINK</b> — Chainlink Oracle Token`,
-      `🐸 <b>$PEPE</b> — Meme Coin ERC-20`,
-      ``,
-      `Pilih menu di bawah untuk memulai:`
+      `🐋 <b>Whale Intelligence Bot</b>`,
+      `Real-time Ethereum Whale Monitoring`,
+      `━━━━━━━━━━━━━━`,
+      `📡 Status: <b>Online</b>`,
+      `👀 Watchlist: <b>${tokenCount} Tokens</b>`,
+      `🔔 Alerts Today: <b>${alertsToday}</b>`,
+      `━━━━━━━━━━━━━━`,
+      `Choose an option:`
     ].join('\n');
 
     await bot.sendMessage(chatId, text, {
       parse_mode: 'HTML',
-      reply_markup: global.botMenus.buildMainMenu(user, global.maintenanceService)
+      reply_markup: global.botMenus.buildMainMenu()
     });
   });
 }

@@ -44,7 +44,13 @@ class InteractiveWhaleBot {
     // Make services available globally
     global.maintenanceService = this.maintenanceService;
     global.botMenus = {
-      buildMainMenu: this.buildMainMenu.bind(this)
+      buildMainMenu: this.buildMainMenu.bind(this),
+      buildDashboardMenu: this.buildDashboardMenu.bind(this),
+      buildSettingsMenu: this.buildSettingsMenu.bind(this),
+      buildWatchlistMenu: this.buildWatchlistMenu.bind(this),
+      buildThresholdMenu: this.buildThresholdMenu.bind(this),
+      buildRiskFilterMenu: this.buildRiskFilterMenu.bind(this),
+      buildHelpMenu: this.buildHelpMenu.bind(this)
     };
 
     this.setupCommands();
@@ -83,36 +89,86 @@ class InteractiveWhaleBot {
     researchHandler.setup();
   }
 
-  buildMainMenu(user, maintenanceService) {
-    const isMaintenance = maintenanceService && maintenanceService.isActive();
-    const statusIcon = createStatusIcon(user.active, isMaintenance);
-    const statusLabel = isMaintenance ? 'MAINTENANCE' : (user.active ? 'AKTIF' : 'NONAKTIF');
+  buildMainMenu() {
+    return {
+      inline_keyboard: [
+        [
+          { text: '📊 Dashboard', callback_data: 'nav_dashboard' }
+        ],
+        [
+          { text: '⚙️ Settings', callback_data: 'nav_settings' }
+        ],
+        [
+          { text: '❓ Help', callback_data: 'nav_help' }
+        ]
+      ]
+    };
+  }
 
+  buildDashboardMenu(user) {
+    const trackingBtn = user.active 
+      ? { text: '⏹ Stop Tracking', callback_data: 'tracking_stop' }
+      : { text: '▶️ Start Tracking', callback_data: 'tracking_start' };
+
+    return {
+      inline_keyboard: [
+        [ trackingBtn ],
+        [ { text: '📜 Alert History', callback_data: 'research_alerts_list' } ],
+        [ { text: '⬅️ Back', callback_data: 'nav_main' } ]
+      ]
+    };
+  }
+
+  buildSettingsMenu() {
+    return {
+      inline_keyboard: [
+        [ { text: '👀 Watchlist', callback_data: 'nav_watchlist' } ],
+        [ { text: '🎯 Threshold', callback_data: 'nav_threshold' } ],
+        [ { text: '⚠️ Risk Filter', callback_data: 'nav_risk' } ],
+        [ { text: '⬅️ Back', callback_data: 'nav_main' } ]
+      ]
+    };
+  }
+
+  buildWatchlistMenu() {
     return {
       inline_keyboard: [
         [
           { text: '➕ Add Token', callback_data: 'menu_add_token' },
-          { text: '📋 My Watchlist', callback_data: 'menu_my_watchlist' }
+          { text: '➖ Remove Token', callback_data: 'menu_remove_token' }
         ],
-        [
-          { text: '🎯 Pilih Token (Old)', callback_data: 'menu_token' },
-          { text: '💰 Set Threshold', callback_data: 'menu_threshold' }
-        ],
-        [
-          { text: '🔔 Filter Risiko', callback_data: 'menu_risk' },
-          { text: '📊 Token Statistics', callback_data: 'menu_token_stats' }
-        ],
-        [
-          { text: '▶️ Mulai Tracking', callback_data: 'tracking_start' },
-          { text: '⏹️ Stop', callback_data: 'tracking_stop' }
-        ],
-        [
-          { text: '📜 Riwayat Alert', callback_data: 'research_alerts_list' },
-          { text: '📈 Status: ' + statusIcon + ' ' + statusLabel, callback_data: 'menu_status' }
-        ],
-        [
-          { text: '❓ Bantuan', callback_data: 'menu_help' }
-        ]
+        [ { text: '📋 View Watchlist', callback_data: 'menu_my_watchlist' } ],
+        [ { text: '⬅️ Back', callback_data: 'nav_settings' } ]
+      ]
+    };
+  }
+
+  buildThresholdMenu() {
+    // Current threshold is handled by text, menu just provides the input options
+    // To match user request, we link to the existing threshold input system but clean up the menu
+    return {
+      inline_keyboard: [
+        [ { text: '💰 Set Min USD', callback_data: 'menu_threshold_usd' } ], // Note: Existing is just 'menu_threshold'
+        [ { text: '⬅️ Back', callback_data: 'nav_settings' } ]
+      ]
+    };
+  }
+
+  buildRiskFilterMenu() {
+    return {
+      inline_keyboard: [
+        [ { text: '🟢 Conservative', callback_data: 'risk_conservative' } ],
+        [ { text: '🟡 Balanced', callback_data: 'risk_balanced' } ],
+        [ { text: '🔴 Aggressive', callback_data: 'risk_aggressive' } ],
+        [ { text: '⬅️ Back', callback_data: 'nav_settings' } ]
+      ]
+    };
+  }
+
+  buildHelpMenu() {
+    return {
+      inline_keyboard: [
+        [ { text: '⬅️ Back', callback_data: 'nav_main' } ]
       ]
     };
   }
