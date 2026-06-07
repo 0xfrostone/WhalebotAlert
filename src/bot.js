@@ -104,7 +104,7 @@ class InteractiveWhaleBot {
           this.listener.addNewToken(tokenData);
 
           // Add to user's watchlist
-          const user = this.watchlistStore.get(chatId);
+          const user = this.watchlistStore.getWatchlist(chatId, msg.from.first_name);
           if (!user.tokens) user.tokens = [];
           if (!user.tokens.includes(tokenData.symbol)) {
             user.tokens.push(tokenData.symbol);

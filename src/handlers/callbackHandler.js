@@ -25,7 +25,7 @@ class CallbackHandler {
     const chatId = query.message.chat.id;
     const msgId = query.message.message_id;
     const data = query.data;
-    const user = this.subscribers.get(chatId, { name: query.from.first_name });
+    const user = this.subscribers.getWatchlist(chatId, query.from.first_name);
     const isAdmin = SETTINGS.ADMIN_IDS.includes(query.from.id);
 
     // Check maintenance untuk non-admin

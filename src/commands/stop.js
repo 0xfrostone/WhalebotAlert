@@ -4,7 +4,7 @@
 function setupStopCommand(bot, watchlistStore) {
   bot.onText(/\/stop/, (msg) => {
     const chatId = msg.chat.id;
-    const user = watchlistStore.get(chatId);
+    const user = watchlistStore.getWatchlist(chatId, msg.from.first_name);
     user.active = false;
     watchlistStore.set(chatId, user);
 

@@ -6,7 +6,7 @@ const { formatUSD, createStatusIcon } = require('../utils/formatter');
 function setupStatusCommand(bot, watchlistStore) {
   bot.onText(/\/status/, async (msg) => {
     const chatId = msg.chat.id;
-    const user = watchlistStore.get(chatId);
+    const user = watchlistStore.getWatchlist(chatId, msg.from.first_name);
     
     const isMaintenance = global.maintenanceService && global.maintenanceService.isActive();
     const statusIcon = createStatusIcon(user.active, isMaintenance);

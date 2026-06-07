@@ -18,8 +18,7 @@ function setupStartCommand(bot, watchlistStore) {
       );
     }
 
-    const user = watchlistStore.get(chatId, { name: msg.from.first_name });
-    user.name = msg.from.first_name;
+    const user = watchlistStore.getWatchlist(chatId, msg.from.first_name);
     // /start selalu reset status ke MATI — user harus klik "Mulai Tracking" untuk aktif
     user.active = false;
     watchlistStore.set(chatId, user);

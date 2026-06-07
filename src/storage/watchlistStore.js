@@ -6,10 +6,11 @@ class WatchlistStore extends StoreBase {
     super('watchlists.json', {});
   }
 
-  getWatchlist(chatId) {
+  getWatchlist(chatId, name = 'User') {
     if (!this.data[chatId]) {
       this.data[chatId] = {
         chatId: chatId,
+        name: name,
         tokens: [], // Default to empty, they must add tokens
         threshold: 50000,
         riskFilter: 'ALL',
@@ -17,6 +18,11 @@ class WatchlistStore extends StoreBase {
         alertCount: 0,
         joinedAt: new Date().toISOString()
       };
+      this.save();
+    }
+    // Update name if it's missing (for older accounts)
+    if (!this.data[chatId].name) {
+      this.data[chatId].name = name;
       this.save();
     }
     return this.data[chatId];
