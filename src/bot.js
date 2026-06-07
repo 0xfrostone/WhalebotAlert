@@ -2,7 +2,7 @@
 // Bot Telegram Interaktif — orchestrator utama
 
 const TelegramBot = require('node-telegram-bot-api');
-const { SubscriberStore } = require('./storage/subscriberStore');
+const { WatchlistStore } = require('./storage/watchlistStore');
 const { MaintenanceStore } = require('./storage/maintenanceStore');
 const { MaintenanceService } = require('./services/maintenanceService');
 const { CallbackHandler } = require('./handlers/callbackHandler');
@@ -33,11 +33,11 @@ class InteractiveWhaleBot {
     });
 
     // Initialize stores
-    this.subscriberStore = new SubscriberStore();
+    this.watchlistStore = new WatchlistStore();
     this.maintenanceStore = new MaintenanceStore();
     this.maintenanceService = new MaintenanceService(
       this.maintenanceStore,
-      this.subscriberStore,
+      this.watchlistStore,
       this.bot
     );
 
@@ -58,20 +58,20 @@ class InteractiveWhaleBot {
   }
 
   setupCommands() {
-    setupStartCommand(this.bot, this.subscriberStore);
-    setupStopCommand(this.bot, this.subscriberStore);
+    setupStartCommand(this.bot, this.watchlistStore);
+    setupStopCommand(this.bot, this.watchlistStore);
     setupHelpCommand(this.bot);
-    setupStatusCommand(this.bot, this.subscriberStore);
+    setupStatusCommand(this.bot, this.watchlistStore);
     setupMaintenanceCommand(this.bot);
     setupResearchCommand(this.bot);
-    setupTestAlertCommand(this.bot, this.subscriberStore);
+    setupTestAlertCommand(this.bot, this.watchlistStore);
     console.log('🧪 /testalert command registered (temporary debug command)');
   }
 
   setupCallbackHandler() {
     const callbackHandler = new CallbackHandler(
       this.bot,
-      this.subscriberStore,
+      this.watchlistStore,
       this.maintenanceService,
       global.botMenus
     );
@@ -91,11 +91,16 @@ class InteractiveWhaleBot {
     return {
       inline_keyboard: [
         [
-          { text: '🎯 Pilih Token', callback_data: 'menu_token' },
+          { text: '➕ Add Token', callback_data: 'menu_add_token' },
+          { text: '📋 My Watchlist', callback_data: 'menu_my_watchlist' }
+        ],
+        [
+          { text: '🎯 Pilih Token (Old)', callback_data: 'menu_token' },
           { text: '💰 Set Threshold', callback_data: 'menu_threshold' }
         ],
         [
-          { text: '🔔 Filter Risiko', callback_data: 'menu_risk' }
+          { text: '🔔 Filter Risiko', callback_data: 'menu_risk' },
+          { text: '📊 Token Statistics', callback_data: 'menu_token_stats' }
         ],
         [
           { text: '▶️ Mulai Tracking', callback_data: 'tracking_start' },
@@ -103,10 +108,7 @@ class InteractiveWhaleBot {
         ],
         [
           { text: '📜 Riwayat Alert', callback_data: 'research_alerts_list' },
-          { text: '📊 Statistik', callback_data: 'research_statistics' }
-        ],
-        [
-          { text: `📈 Status: ${statusIcon} ${statusLabel}`, callback_data: 'menu_status' }
+          { text: '📈 Status: ' + statusIcon + ' ' + statusLabel, callback_data: 'menu_status' }
         ],
         [
           { text: '❓ Bantuan', callback_data: 'menu_help' }
@@ -130,21 +132,22 @@ class InteractiveWhaleBot {
     console.log(`\n🔊 [BROADCAST] Starting for ${tokenSymbol} ${alertData.direction} | USD: ${formatUSDLog(usdValue)} | Risk: ${riskCategory}`);
     
     // === DEBUG: Dump subscriber state ===
-    const allSubs = this.subscriberStore.getAll();
-    console.log(`   📋 [BROADCAST] Subscriber store loaded: ${allSubs.size} subscribers found`);
-    if (allSubs.size === 0) {
+    const allSubs = this.watchlistStore.getAllActiveSubscribers();
+    console.log(`   📋 [BROADCAST] Subscriber store loaded: ${allSubs.length} active subscribers found`);
+    if (allSubs.length === 0) {
       console.log(`   ⚠️ [BROADCAST] NO SUBSCRIBERS! Use /start di Telegram untuk subscribe.`);
       return 0;
     }
     
     // Log ringkasan setiap subscriber sebelum filtering
-    for (const [chatId, user] of allSubs) {
-      const tokensArr = user.tokens instanceof Set ? [...user.tokens] : (Array.isArray(user.tokens) ? user.tokens : []);
-      console.log(`   👤 Sub ${chatId} (${user.name}): active=${user.active} | tokens=[${tokensArr.join(',')}] | threshold=${user.threshold} | riskFilter=${user.riskFilter}`);
+    for (const user of allSubs) {
+      const tokensArr = user.tokens || [];
+      console.log(`   👤 Sub ${user.chatId} (${user.name}): active=${user.active} | tokens=[${tokensArr.join(',')}] | threshold=${user.threshold} | riskFilter=${user.riskFilter}`);
     }
     console.log(`   ---`);
 
-    for (const [chatId, user] of allSubs) {
+    for (const user of allSubs) {
+      const chatId = user.chatId;
       totalSubs++;
       
       // === FILTER: active ===
@@ -209,7 +212,7 @@ class InteractiveWhaleBot {
         console.log(`   ✅ [SENT] Successfully sent to ${chatId} (${user.name}) — alertCount now: ${user.alertCount}`);
       } catch (err) {
         if (err.message.includes('blocked') || err.message.includes('not found')) {
-          this.subscriberStore.delete(chatId);
+          this.watchlistStore.delete(chatId);
           console.log(`   ❌ [ERROR] User ${chatId} removed (blocked/not found): ${err.message}`);
         } else {
           console.log(`   ⚠️ [ERROR] Failed sending to ${chatId}: ${err.message}`);
@@ -219,7 +222,7 @@ class InteractiveWhaleBot {
 
     console.log(`\n📱 [BROADCAST RESULT] Sent: ${sent}/${totalSubs} | Filtered: ${filtered} | Token: ${tokenSymbol} | USD: ${formatUSDLog(usdValue)} | Risk: ${riskCategory}`);
     if (sent > 0) {
-      this.subscriberStore.save();
+      this.watchlistStore.save();
       console.log(`   💾 Subscriber data saved (alertCount updated)`);
     }
     if (sent === 0 && totalSubs > 0) {
@@ -236,10 +239,42 @@ class InteractiveWhaleBot {
     return sent;
   }
 
+  async broadcastAccumulation(accumulationData) {
+    if (this.maintenanceService.isActive()) return 0;
+    
+    let sent = 0;
+    const allSubs = this.watchlistStore.getAllActiveSubscribers();
+    
+    for (const user of allSubs) {
+      const chatId = user.chatId;
+      const hasToken = user.tokens && user.tokens.includes(accumulationData.tokenSymbol);
+      
+      if (!hasToken) continue;
+      
+      try {
+        const { NotificationService } = require('./services/notifier');
+        const message = NotificationService.formatAccumulationAlert(accumulationData);
+        
+        await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'HTML',
+          disable_web_page_preview: true
+        });
+        sent++;
+      } catch (err) {
+        if (err.message.includes('blocked') || err.message.includes('not found')) {
+          this.watchlistStore.delete(chatId);
+        }
+      }
+    }
+    return sent;
+  }
+
   getStats() {
+    const all = this.watchlistStore.getAll();
+    const activeSubs = this.watchlistStore.getAllActiveSubscribers();
     return {
-      total: this.subscriberStore.count(),
-      active: this.subscriberStore.countActive()
+      total: Object.keys(all).length,
+      active: activeSubs.length
     };
   }
 }

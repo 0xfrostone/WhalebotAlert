@@ -204,10 +204,16 @@ function calculateWhaleScore(txData) {
 // HITUNG RISK CATEGORY
 // ============================================================
 function getRiskCategory(whaleScore, lpImpactPct) {
-  // Combine whale score dan LP impact
-  if (whaleScore >= 75 || lpImpactPct >= 0.20) return 'EXTREME';
-  if (whaleScore >= 55 || lpImpactPct >= 0.10) return 'HIGH';
-  if (whaleScore >= 35 || lpImpactPct >= 0.05) return 'MEDIUM';
+  // Adaptive Alert Levels based on Liquidity Impact
+  // Feature 5 Requirements:
+  // LOW: > 0.05% (0.0005)
+  // MEDIUM: > 0.10% (0.0010)
+  // HIGH: > 0.25% (0.0025)
+  // CRITICAL: > 0.50% (0.0050)
+  
+  if (lpImpactPct >= 0.0050) return 'CRITICAL';
+  if (lpImpactPct >= 0.0025) return 'HIGH';
+  if (lpImpactPct >= 0.0010) return 'MEDIUM';
   return 'LOW';
 }
 
@@ -276,14 +282,7 @@ async function analyzeSwap(swapData, config) {
   const enrichedData = { ...swapData, usdValue, lpImpactPct };
   const whaleScore = calculateWhaleScore(enrichedData);
   
-  console.log(`   Whale Score: ${whaleScore.total}/100 (min: ${MIN_WHALE_SCORE})`);
-  
-  // Filter 3: Skor terlalu rendah?
-  if (whaleScore.total < MIN_WHALE_SCORE) {
-    console.log(`   ❌ FILTER 3 FAIL: Score ${whaleScore.total} < Min ${MIN_WHALE_SCORE}`);
-    return null;
-  }
-  console.log(`   ✅ FILTER 3 PASS: Whale score OK`);
+  console.log(`   Whale Score: ${whaleScore.total}/100 (Logged for statistics only)`);
   
   // Risk category (informasi untuk user, filtering dilakukan per-user di broadcast)
   // REMOVED: Filter 4 yang menolak semua LOW risk

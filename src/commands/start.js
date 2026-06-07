@@ -3,7 +3,7 @@
 
 const { SETTINGS } = require('../config/settings');
 
-function setupStartCommand(bot, subscriberStore) {
+function setupStartCommand(bot, watchlistStore) {
   bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -18,11 +18,11 @@ function setupStartCommand(bot, subscriberStore) {
       );
     }
 
-    const user = subscriberStore.get(chatId, { name: msg.from.first_name });
+    const user = watchlistStore.get(chatId, { name: msg.from.first_name });
     user.name = msg.from.first_name;
     // /start selalu reset status ke MATI — user harus klik "Mulai Tracking" untuk aktif
     user.active = false;
-    subscriberStore.set(chatId, user);
+    watchlistStore.set(chatId, user);
 
     const text = [
       `🐳 <b>Whale Intelligence Bot</b>`,

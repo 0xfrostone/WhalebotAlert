@@ -4,9 +4,9 @@
 const { logAdmin, logAlert } = require('../utils/logger');
 
 class MaintenanceService {
-  constructor(maintenanceStore, subscriberStore, bot) {
+  constructor(maintenanceStore, watchlistStore, bot) {
     this.store = maintenanceStore;
-    this.subscribers = subscriberStore;
+    this.subscribers = watchlistStore;
     this.bot = bot;
   }
 

@@ -1,12 +1,12 @@
 // src/commands/stop.js
 // Command /stop
 
-function setupStopCommand(bot, subscriberStore) {
+function setupStopCommand(bot, watchlistStore) {
   bot.onText(/\/stop/, (msg) => {
     const chatId = msg.chat.id;
-    const user = subscriberStore.get(chatId);
+    const user = watchlistStore.get(chatId);
     user.active = false;
-    subscriberStore.set(chatId, user);
+    watchlistStore.set(chatId, user);
 
     bot.sendMessage(chatId,
       '⏹️ <b>Tracking dihentikan.</b>\n\nKetik /start untuk mulai lagi.',

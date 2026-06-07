@@ -167,6 +167,30 @@ class NotificationService {
       `⚡️ <i>Bukan saran finansial. DYOR.</i>`
     ].join('\n');
   }
+
+  static formatAccumulationAlert(data) {
+    const {
+      wallet, tokenSymbol, direction, transactions, totalVolume, combinedImpactPct, timeWindow, riskLevel
+    } = data;
+
+    const emoji = { EXTREME: '🚨', HIGH: '⚠️', MEDIUM: '📊', LOW: 'ℹ️', CRITICAL: '🔥' };
+    const riskLabel = { EXTREME: 'Sangat Tinggi', HIGH: 'Tinggi', MEDIUM: 'Sedang', LOW: 'Rendah', CRITICAL: 'Kritis' };
+
+    return [
+      `🐳 <b>ACCUMULATION ALERT</b>`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `Wallet: <code>${wallet.slice(0, 6)}...${wallet.slice(-4)}</code>`,
+      `Token: <b>$${tokenSymbol}</b>`,
+      `Arah: <b>${direction}</b>`,
+      ``,
+      `🔄 Transaksi: <b>${transactions}x</b>`,
+      `💰 Total Volume: <b>${formatUSD(totalVolume)}</b>`,
+      `🌊 Total Impact: <b>${(combinedImpactPct * 100).toFixed(2)}%</b>`,
+      `⏳ Periode Waktu: <b>${timeWindow}</b>`,
+      ``,
+      `${emoji[riskLevel] || 'ℹ️'} Tingkat Risiko: <b>${riskLabel[riskLevel] || riskLevel}</b>`
+    ].join('\n');
+  }
 }
 
 module.exports = { NotificationService };

@@ -7,6 +7,7 @@ const { BlockchainListener }  = require('./src/blockchain/listener');
 const { analyzeSwap }          = require('./src/blockchain/detector');
 const { InteractiveWhaleBot }  = require('./src/bot');
 const { AlertLogger }          = require('./src/services/alertLogger');
+const { AccumulationTracker }  = require('./src/blockchain/accumulationTracker');
 
 // ============================================================
 // UTILITAS: Simpan alert dan statistik wallet
@@ -143,6 +144,8 @@ async function main() {
     errors:      0
   };
 
+  const accumulationTracker = new AccumulationTracker();
+
   // ============================================================
   // CALLBACK: dipanggil setiap ada Swap event dari blockchain
   // ============================================================
@@ -170,20 +173,25 @@ async function main() {
       const subscriberStats = bot.getStats();
       console.log(`   Subscribers: ${subscriberStats.total} total, ${subscriberStats.active} active`);
       
-      const sent = await bot.broadcast(result);
-      console.log(`   [STAGE 2 RESULT] bot.broadcast() returned: sent=${sent}`);
-
-      // === STAGE 3: Post-broadcast actions ===
-      if (sent > 0) {
+      if (result) {
+        // --- 1. WHALE ALERT BROADCAST ---
         stats.alertsSent++;
-        console.log(`   [STAGE 3] Alert sent! Saving to disk & logging...`);
+        console.log(`🚀 Mengirim Whale Alert ke bot...`);
+        const sentCount = await bot.broadcast(result);
+        console.log(`✅ Alert berhasil dikirim ke ${sentCount} user(s)`);
+
+        // Simpan alert
         saveAlert(result);
-        updateWalletStats(result.wallet, result);
-        await alertLogger.logAlert(result, sent);
-        console.log(`   ✅ [STAGE 3] Alert saved. Total alerts sent so far: ${stats.alertsSent}`);
-      } else {
-        console.log(`   ⚠️ [STAGE 3] Alert passed system filters but was NOT sent to any subscriber.`);
-        console.log(`   Possible causes: no active subscribers, threshold mismatch, token not in watchlist, risk filter.`);
+        alertLogger.logAlert(result);
+        
+        // --- 2. ACCUMULATION DETECTION ---
+        const accumulationEvent = accumulationTracker.processSwap(result);
+        if (accumulationEvent) {
+          console.log(`🐳 [ACCUMULATION DETECTED] ${accumulationEvent.wallet} accumulated ${accumulationEvent.tokenSymbol}`);
+          if (bot.broadcastAccumulation) {
+            await bot.broadcastAccumulation(accumulationEvent);
+          }
+        }
       }
 
     } catch (err) {

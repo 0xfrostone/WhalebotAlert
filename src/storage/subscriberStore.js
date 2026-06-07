@@ -1,4 +1,4 @@
-// src/storage/subscriberStore.js
+// src/storage/watchlistStore.js
 // Manajemen data subscriber
 
 const fs = require('fs');
@@ -6,7 +6,7 @@ const path = require('path');
 
 const SUBSCRIBERS_FILE = path.join(process.cwd(), 'data', 'subscribers.json');
 
-class SubscriberStore {
+class watchlistStore {
   constructor() {
     this.subscribers = this.load();
   }
@@ -83,4 +83,4 @@ class SubscriberStore {
   }
 }
 
-module.exports = { SubscriberStore };
+module.exports = { watchlistStore };

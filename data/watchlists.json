@@ -1,0 +1,75 @@
+{
+  "1944580692": {
+    "chatId": "1944580692",
+    "tokens": [
+      "LINK",
+      "PEPE",
+      "UNI"
+    ],
+    "threshold": 10000,
+    "riskFilter": "ALL",
+    "active": false,
+    "alertCount": 0,
+    "joinedAt": "2026-05-30T18:48:27.260Z",
+    "name": "yui",
+    "updatedAt": "2026-06-07T14:58:06.596Z"
+  },
+  "2106924638": {
+    "chatId": "2106924638",
+    "tokens": [
+      "LINK"
+    ],
+    "threshold": 50000,
+    "riskFilter": "HIGH_EXTREME",
+    "active": false,
+    "alertCount": 0,
+    "joinedAt": "2026-05-30T18:47:25.024Z",
+    "name": "Rie",
+    "updatedAt": "2026-06-07T14:58:06.597Z"
+  },
+  "5119003079": {
+    "chatId": "5119003079",
+    "tokens": [
+      "UNI",
+      "LINK",
+      "PEPE"
+    ],
+    "threshold": 1000,
+    "riskFilter": "ALL",
+    "active": true,
+    "alertCount": 0,
+    "joinedAt": "2026-05-29T11:19:54.468Z",
+    "name": "frostTone",
+    "updatedAt": "2026-06-07T14:58:06.620Z"
+  },
+  "5345373659": {
+    "chatId": "5345373659",
+    "tokens": [
+      "UNI",
+      "LINK",
+      "PEPE"
+    ],
+    "threshold": 10000,
+    "riskFilter": "ALL",
+    "active": true,
+    "alertCount": 0,
+    "joinedAt": "2026-05-29T11:47:12.681Z",
+    "name": "Innwerkara",
+    "updatedAt": "2026-06-07T14:58:06.630Z"
+  },
+  "7220530689": {
+    "chatId": "7220530689",
+    "tokens": [
+      "UNI",
+      "LINK",
+      "PEPE"
+    ],
+    "threshold": 50000,
+    "riskFilter": "ALL",
+    "active": false,
+    "alertCount": 0,
+    "joinedAt": "2026-05-30T18:47:25.040Z",
+    "name": "shihao.g",
+    "updatedAt": "2026-06-07T14:58:06.642Z"
+  }
+}

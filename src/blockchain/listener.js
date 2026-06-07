@@ -15,152 +15,7 @@ const UNISWAP_V3_POOL_ABI = [
   'event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)'
 ];
 
-// ============================================================
-// DAFTAR POOL YANG DIPANTAU
-// ============================================================
-
-// Format: { address, dex, token0Symbol, token1Symbol, token0Decimals, token1Decimals, version }
-// Penelitian fokus pada 3 token ERC-20: UNI, LINK, PEPE
-//
-// PENTING: Pool address harus sesuai dengan version!
-// - version: 2 → menggunakan V2 Swap ABI (amount0In, amount1In, amount0Out, amount1Out)
-// - version: 3 → menggunakan V3 Swap ABI (amount0, amount1, sqrtPriceX96, liquidity, tick)
-// Jika salah, event akan gagal decode secara silent!
-//
-// Pool addresses verified on-chain via Uniswap V3 Factory.getPool() — 2026-06-02
-const WATCHED_POOLS = [
-
-  // ================================================================
-  // === UNI (Uniswap Governance Token) ===
-  // Contract: 0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984
-  // ================================================================
-  {
-    address: '0xd3d2E2692501A5c9Ca623199D38826e513033a17',
-    dex: 'Uniswap V2',
-    token0Symbol: 'UNI',
-    token1Symbol: 'WETH',
-    token0Decimals: 18,
-    token1Decimals: 18,
-    version: 2,
-    baseTokenIndex: 1,
-    tokenAddress: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984'
-  },
-  {
-    // Verified on-chain: Factory.getPool(UNI, WETH, 3000) = 0x1d42064F...
-    address: '0x1d42064Fc4Beb5F8aAF85F4617AE8b3b5B8Bd801',
-    dex: 'Uniswap V3 (0.3%)',
-    token0Symbol: 'UNI',
-    token1Symbol: 'WETH',
-    token0Decimals: 18,
-    token1Decimals: 18,
-    version: 3,
-    baseTokenIndex: 1,
-    tokenAddress: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984'
-  },
-  {
-    // UNI/WETH V3 1% fee — large trades often route through 1% pools
-    // Verified on-chain: Factory.getPool(UNI, WETH, 10000) = 0x360b9726...
-    address: '0x360b9726186C0F62cc719450685ce70280774Dc8',
-    dex: 'Uniswap V3 (1%)',
-    token0Symbol: 'UNI',
-    token1Symbol: 'WETH',
-    token0Decimals: 18,
-    token1Decimals: 18,
-    version: 3,
-    baseTokenIndex: 1,
-    tokenAddress: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984'
-  },
-
-  // ================================================================
-  // === LINK (Chainlink Oracle Token) ===
-  // Contract: 0x514910771AF9Ca656af840dff83E8264EcF986CA
-  // ================================================================
-  {
-    address: '0xa2107FA5B38d9bbd2C461D6EDf11B11A50F6b974',
-    dex: 'Uniswap V2',
-    token0Symbol: 'LINK',
-    token1Symbol: 'WETH',
-    token0Decimals: 18,
-    token1Decimals: 18,
-    version: 2,
-    baseTokenIndex: 1,
-    tokenAddress: '0x514910771AF9Ca656af840dff83E8264EcF986CA'
-  },
-  {
-    // Verified on-chain: Factory.getPool(LINK, WETH, 3000) = 0xa6Cc3C25...
-    address: '0xa6Cc3C2531FdaA6Ae1A3CA84c2855806728693e8',
-    dex: 'Uniswap V3 (0.3%)',
-    token0Symbol: 'LINK',
-    token1Symbol: 'WETH',
-    token0Decimals: 18,
-    token1Decimals: 18,
-    version: 3,
-    baseTokenIndex: 1,
-    tokenAddress: '0x514910771AF9Ca656af840dff83E8264EcF986CA'
-  },
-  {
-    // LINK/WETH V3 1% fee — whale transactions often use this pool
-    // Verified on-chain: Factory.getPool(LINK, WETH, 10000) = 0x3A0f221e...
-    address: '0x3A0f221eA8B150f3D3d27DE8928851aB5264bB65',
-    dex: 'Uniswap V3 (1%)',
-    token0Symbol: 'LINK',
-    token1Symbol: 'WETH',
-    token0Decimals: 18,
-    token1Decimals: 18,
-    version: 3,
-    baseTokenIndex: 1,
-    tokenAddress: '0x514910771AF9Ca656af840dff83E8264EcF986CA'
-  },
-
-  // ================================================================
-  // === PEPE (Meme Coin ERC-20) ===
-  // Contract: 0x6982508145454Ce325dDbE47a25d4ec3d2311933
-  //
-  // ⚠️ BUG FIX: Alamat lama 0xa43fe169... adalah pool Uniswap V2,
-  // BUKAN V3! Kode sebelumnya mendeklarasikan version: 3 sehingga
-  // menggunakan V3 ABI untuk decode event V2 → decode SELALU gagal
-  // → event dibuang secara silent → PEPE tidak pernah terdeteksi!
-  // ================================================================
-  {
-    // PEPE/WETH V3 0.3% — CORRECT address verified on-chain
-    // Factory.getPool(PEPE, WETH, 3000) = 0x11950d14...
-    address: '0x11950d141EcB863F01007AdD7D1A342041227b58',
-    dex: 'Uniswap V3 (0.3%)',
-    token0Symbol: 'PEPE',
-    token1Symbol: 'WETH',
-    token0Decimals: 18,
-    token1Decimals: 18,
-    version: 3,
-    baseTokenIndex: 1,
-    tokenAddress: '0x6982508145454Ce325dDbE47a25d4ec3d2311933'
-  },
-  {
-    // PEPE/WETH V3 1% fee — high volume for meme coin trades
-    // Factory.getPool(PEPE, WETH, 10000) = 0xF239009A...
-    address: '0xF239009A101B6B930A527DEaaB6961b6E7deC8a6',
-    dex: 'Uniswap V3 (1%)',
-    token0Symbol: 'PEPE',
-    token1Symbol: 'WETH',
-    token0Decimals: 18,
-    token1Decimals: 18,
-    version: 3,
-    baseTokenIndex: 1,
-    tokenAddress: '0x6982508145454Ce325dDbE47a25d4ec3d2311933'
-  },
-  {
-    // PEPE/WETH V2 — alamat lama, sekarang dengan version: 2 yang benar
-    address: '0xa43fe16908251ee70ef74718545e4fe6c5ccec9f',
-    dex: 'Uniswap V2',
-    token0Symbol: 'PEPE',
-    token1Symbol: 'WETH',
-    token0Decimals: 18,
-    token1Decimals: 18,
-    version: 2,
-    baseTokenIndex: 1,
-    tokenAddress: '0x6982508145454Ce325dDbE47a25d4ec3d2311933'
-  }
-];
-
+const { TokenStore } = require('../storage/tokenStore');
 
 // ============================================================
 // BLOCKCHAIN LISTENER CLASS
@@ -178,6 +33,8 @@ class BlockchainListener {
     this.reconnectDelay = 3000;  // 3 detik awal
     this.isRunning = false;
     this.totalEventsReceived = 0;
+    this.tokenStore = new TokenStore();
+    this.activePools = 0;
   }
 
   async start() {
@@ -216,28 +73,50 @@ class BlockchainListener {
   }
 
   async setupPoolListeners() {
-    for (const pool of WATCHED_POOLS) {
-      const filter = {
-        address: pool.address,
-        topics: [
-          pool.version === 2
-            ? this.interfaces.v2.getEvent('Swap').topicHash
-            : this.interfaces.v3.getEvent('Swap').topicHash
-        ]
-      };
-
-      this.provider.on(filter, async (log) => {
-        try {
-          await this.processSwapLog(log, pool);
-        } catch (err) {
-          console.error(`Error proses log: ${err.message}`);
+    const tokens = this.tokenStore.getAllTokens();
+    let count = 0;
+    
+    for (const token of tokens) {
+      if (token.pools && token.pools.length > 0) {
+        for (const pool of token.pools) {
+          this.attachPoolListener(pool);
+          count++;
         }
-      });
-
-      console.log(`👂 Memantau pool ${pool.token0Symbol}/${pool.token1Symbol} (${pool.dex})`);
+      }
     }
 
-    console.log(`\n🚀 Sistem aktif! Memantau ${WATCHED_POOLS.length} pool...\n`);
+    console.log(`\n🚀 Sistem aktif! Memantau ${count} pool...\n`);
+  }
+
+  attachPoolListener(pool) {
+    const filter = {
+      address: pool.address,
+      topics: [
+        pool.version === 2
+          ? this.interfaces.v2.getEvent('Swap').topicHash
+          : this.interfaces.v3.getEvent('Swap').topicHash
+      ]
+    };
+
+    this.provider.on(filter, async (log) => {
+      try {
+        await this.processSwapLog(log, pool);
+      } catch (err) {
+        console.error(`Error proses log: ${err.message}`);
+      }
+    });
+
+    console.log(`👂 Memantau pool ${pool.token0Symbol}/${pool.token1Symbol} (${pool.dex})`);
+    this.activePools++;
+  }
+
+  addNewToken(tokenData) {
+    console.log(`[LISTENER] Menambahkan token baru secara dinamis: ${tokenData.symbol}`);
+    if (tokenData.pools && tokenData.pools.length > 0) {
+      for (const pool of tokenData.pools) {
+        this.attachPoolListener(pool);
+      }
+    }
   }
 
   async processSwapLog(log, pool) {
@@ -389,9 +268,9 @@ class BlockchainListener {
   getStats() {
     return {
       totalEvents: this.totalEventsReceived,
-      poolsMonitored: WATCHED_POOLS.length
+      poolsMonitored: this.activePools
     };
   }
 }
 
-module.exports = { BlockchainListener, WATCHED_POOLS };
+module.exports = { BlockchainListener };

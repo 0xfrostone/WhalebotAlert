@@ -10,9 +10,9 @@ const { logAdmin } = require('../utils/logger');
 const { formatUSD } = require('../utils/formatter');
 
 class CallbackHandler {
-  constructor(bot, subscriberStore, maintenanceService, botMenus) {
+  constructor(bot, watchlistStore, maintenanceService, botMenus) {
     this.bot = bot;
-    this.subscribers = subscriberStore;
+    this.subscribers = watchlistStore;
     this.maintenance = maintenanceService;
     this.menus = botMenus;
   }

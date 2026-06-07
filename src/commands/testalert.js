@@ -7,7 +7,7 @@ const { SETTINGS } = require('../config/settings');
 const { NotificationService } = require('../services/notifier');
 const { formatUSDLog } = require('../utils/formatter');
 
-function setupTestAlertCommand(bot, subscriberStore) {
+function setupTestAlertCommand(bot, watchlistStore) {
   bot.onText(/\/testalert/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -67,7 +67,7 @@ function setupTestAlertCommand(bot, subscriberStore) {
     console.log(`\n🧪 [TESTALERT] TAHAP 2: Broadcast test — simulating full pipeline`);
     
     // Log subscriber state
-    const allSubs = subscriberStore.getAll();
+    const allSubs = watchlistStore.getAll();
     console.log(`🧪 [TESTALERT] Subscribers in store: ${allSubs.size}`);
     
     for (const [subChatId, user] of allSubs) {
