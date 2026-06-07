@@ -98,18 +98,24 @@ class InteractiveWhaleBot {
         try {
           // Validate and fetch on-chain data
           console.log(`[WATCHLIST] Contract Validated: ${text}`);
-          const tokenData = await this.tokenService.validateAndAddToken(text);
+          const { tokenData, isNew } = await this.tokenService.validateAndAddToken(text);
           
-          // Add to system listener dynamically
-          this.listener.addNewToken(tokenData);
-
-          // Add to user's watchlist
           const user = this.watchlistStore.getWatchlist(chatId, msg.from.first_name);
           if (!user.tokens) user.tokens = [];
-          if (!user.tokens.includes(tokenData.symbol)) {
-            user.tokens.push(tokenData.symbol);
-            this.watchlistStore.set(chatId, user);
+
+          // Only reject if it already exists in the *user's* watchlist
+          if (user.tokens.includes(tokenData.symbol)) {
+            throw new Error(`Token ${tokenData.symbol} sudah ada di Watchlist kamu.`);
           }
+
+          // Add to system listener dynamically ONLY if it's a globally new token
+          if (isNew) {
+            this.listener.addNewToken(tokenData);
+          }
+
+          // Add to user's watchlist
+          user.tokens.push(tokenData.symbol);
+          this.watchlistStore.set(chatId, user);
           
           console.log(`[WATCHLIST] Token Added: ${tokenData.symbol} by ${chatId}`);
 

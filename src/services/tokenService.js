@@ -48,29 +48,31 @@ class TokenService {
         throw new Error('Kontrak tidak valid atau bukan ERC-20 standard');
       }
 
-      if (this.tokenStore.hasToken(symbol)) {
-        throw new Error(`Token ${symbol} sudah terdaftar!`);
+      let isNew = false;
+      let tokenData = this.tokenStore.getToken(symbol);
+
+      if (!tokenData) {
+        // Discover Pools
+        console.log(`[TokenService] Discovering pools for ${symbol}...`);
+        const pools = await this.discoverPools(tokenAddress, symbol, decimals);
+
+        if (pools.length === 0) {
+          throw new Error(`Tidak ditemukan liquidity pool aktif untuk ${symbol}/WETH di Uniswap V2/V3`);
+        }
+
+        tokenData = {
+          symbol: symbol.toUpperCase(),
+          address: tokenAddress,
+          decimals: Number(decimals),
+          pools: pools
+        };
+
+        this.tokenStore.addToken(tokenData);
+        isNew = true;
+        console.log(`[TokenService] Successfully added ${symbol} with ${pools.length} pools`);
       }
 
-      // Discover Pools
-      console.log(`[TokenService] Discovering pools for ${symbol}...`);
-      const pools = await this.discoverPools(tokenAddress, symbol, decimals);
-
-      if (pools.length === 0) {
-        throw new Error(`Tidak ditemukan liquidity pool aktif untuk ${symbol}/WETH di Uniswap V2/V3`);
-      }
-
-      const tokenData = {
-        symbol: symbol.toUpperCase(),
-        address: tokenAddress,
-        decimals: Number(decimals),
-        pools: pools
-      };
-
-      this.tokenStore.addToken(tokenData);
-      console.log(`[TokenService] Successfully added ${symbol} with ${pools.length} pools`);
-      
-      return tokenData;
+      return { tokenData, isNew };
     } catch (err) {
       console.error(`[TokenService] Error adding token:`, err.message);
       throw err;
