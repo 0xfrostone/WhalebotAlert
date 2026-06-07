@@ -44,7 +44,7 @@ class CallbackHandler {
       const tokenCount = user.tokens ? user.tokens.length : 0;
       const alertsToday = user.alertCount || 0;
       return this.editMsg(chatId, msgId,
-        `🐋 <b>Whale Intelligence Bot</b>\nReal-time Ethereum Whale Monitoring\n━━━━━━━━━━━━━━\n📡 Status: <b>Online</b>\n👀 Watchlist: <b>${tokenCount} Tokens</b>\n🔔 Alerts Today: <b>${alertsToday}</b>\n━━━━━━━━━━━━━━\nChoose an option:`,
+        `🐋 <b>Whale Intelligence Bot</b>\n\nReal-time Ethereum Whale Monitoring\n\n━━━━━━━━━━━━━━━━━━━━\n\n📡 Status: <b>Online</b>\n👀 Watchlist: <b>${tokenCount} Token</b>\n🔔 Alert Hari Ini: <b>${alertsToday}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\nPilih menu:`,
         this.menus.buildMainMenu()
       );
     }
@@ -54,21 +54,21 @@ class CallbackHandler {
       const tokenCount = user.tokens ? user.tokens.length : 0;
       const alertsToday = user.alertCount || 0;
       return this.editMsg(chatId, msgId,
-        `📊 <b>Dashboard</b>\n━━━━━━━━━━━━━━\n📡 Bot Status: <b>Online</b>\n👥 Subscribers: <b>${stats.active}</b>\n👀 Tracked Tokens: <b>${tokenCount}</b>\n🚨 Alerts Today: <b>${alertsToday}</b>\n━━━━━━━━━━━━━━`,
+        `📊 <b>Dashboard</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n📡 Status Bot: <b>Online</b>\n👥 Subscriber Aktif: <b>${stats.active}</b>\n👀 Token Dipantau: <b>${tokenCount}</b>\n🔔 Alert Hari Ini: <b>${alertsToday}</b>\n\n━━━━━━━━━━━━━━━━━━━━`,
         this.menus.buildDashboardMenu(user)
       );
     }
 
     if (data === 'nav_settings') {
       return this.editMsg(chatId, msgId,
-        `⚙️ <b>Settings</b>\n\nConfigure your whale monitoring preferences.`,
+        `⚙️ <b>Pengaturan</b>\n\nKelola konfigurasi sistem monitoring.`,
         this.menus.buildSettingsMenu()
       );
     }
 
     if (data === 'nav_watchlist') {
       return this.editMsg(chatId, msgId,
-        `👀 <b>Watchlist Menu</b>\n\nManage the tokens you are currently tracking.`,
+        `👀 <b>Watchlist Menu</b>\n\nKelola token yang sedang dipantau.`,
         this.menus.buildWatchlistMenu()
       );
     }
@@ -90,7 +90,7 @@ class CallbackHandler {
 
     if (data === 'nav_help') {
       return this.editMsg(chatId, msgId,
-        `❓ <b>Help & Documentation</b>\n\n<b>Purpose:</b>\nMonitors Ethereum DEX liquidity pools for whale transactions and tracks accumulation patterns.\n\n<b>Whale Detection:</b>\nEvaluates USD volume and Liquidity Impact percentage to determine on-chain market effects.\n\n<b>Contact:</b>\nSystem Administrator`,
+        `❓ <b>Bantuan</b>\n\n<b>Tentang Sistem</b>\nBot ini memantau aktivitas transaksi whale pada jaringan Ethereum secara real-time menggunakan data on-chain dari liquidity pool DEX.\n\n<b>Fitur Utama</b>\n• Deteksi transaksi whale\n• Monitoring UNI, LINK, dan PEPE\n• Analisis nilai transaksi dalam USD\n• Perhitungan Liquidity Impact\n• Skor aktivitas whale\n\n<b>Cara Penggunaan</b>\n1. Tambahkan token ke Watchlist\n2. Atur Threshold deteksi\n3. Aktifkan monitoring\n4. Terima notifikasi saat whale terdeteksi\n\n<b>Kontak</b>\nAdministrator Sistem`,
         this.menus.buildHelpMenu()
       );
     }
@@ -100,21 +100,31 @@ class CallbackHandler {
       const tokenCount = user.tokens ? user.tokens.length : 0;
       const alertsToday = user.alertCount || 0;
       return this.editMsg(chatId, msgId,
-        `🐋 <b>Whale Intelligence Bot</b>\nReal-time Ethereum Whale Monitoring\n━━━━━━━━━━━━━━\n📡 Status: <b>Online</b>\n👀 Watchlist: <b>${tokenCount} Tokens</b>\n🔔 Alerts Today: <b>${alertsToday}</b>\n━━━━━━━━━━━━━━\nChoose an option:`,
+        `🐋 <b>Whale Intelligence Bot</b>\n\nReal-time Ethereum Whale Monitoring\n\n━━━━━━━━━━━━━━━━━━━━\n\n📡 Status: <b>Online</b>\n👀 Watchlist: <b>${tokenCount} Token</b>\n🔔 Alert Hari Ini: <b>${alertsToday}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\nPilih menu:`,
         this.menus.buildMainMenu()
       );
     }
 
     // ——— MENU ITEMS ———
-    if (data === 'menu_token') {
-      const sel = user.tokens.size ? [...user.tokens].map(t => `$${t}`).join(', ') : 'Belum ada';
+    if (data === 'menu_add_token' || data === 'menu_remove_token' || data === 'menu_token') {
+      const tokensArr = user.tokens || [];
+      const sel = tokensArr.length ? tokensArr.map(t => `$${t}`).join(', ') : 'Belum ada';
       return this.editMsg(chatId, msgId,
         `🎯 <b>Pilih Token yang Dipantau</b>\n\nToken aktif: <b>${sel}</b>\n\nCentang/hapus centang token:`,
         TokenHandler.buildMenu(user)
       );
     }
 
-    if (data === 'menu_threshold') {
+    if (data === 'menu_my_watchlist') {
+      const tokensArr = user.tokens || [];
+      const tokenList = tokensArr.length ? tokensArr.map(t => `• ${t}`).join('\n') : '<i>Belum ada token</i>';
+      return this.editMsg(chatId, msgId,
+        `👀 <b>Watchlist Token</b>\n\nToken yang sedang dipantau:\n\n${tokenList}`,
+        this.menus.buildWatchlistMenu()
+      );
+    }
+
+    if (data === 'menu_threshold' || data === 'menu_threshold_usd') {
       return this.editMsg(chatId, msgId,
         `💰 <b>Set Threshold Minimum</b>\n\nThreshold saat ini: <b>${formatUSD(user.threshold)}</b>\n\nAlert hanya dikirim jika nilai transaksi melebihi angka ini:`,
         ThresholdHandler.buildMenu(user)
@@ -170,8 +180,8 @@ class CallbackHandler {
       const sel = TokenHandler.getSelectedText(user);
       this.subscribers.set(chatId, user);
       return this.editMsg(chatId, msgId,
-        `✅ <b>Token Tersimpan!</b>\n\nMemantau: ${sel}\n\nKembali ke menu utama:`,
-        this.menus.buildMainMenu(user, this.maintenance)
+        `✅ <b>Token Tersimpan!</b>\n\nMemantau: ${sel}\n\nKembali ke menu watchlist:`,
+        this.menus.buildWatchlistMenu(user)
       );
     }
 
@@ -218,7 +228,7 @@ class CallbackHandler {
       const tokensArr = user.tokens || [];
       if (tokensArr.length === 0) {
         return this.bot.answerCallbackQuery(query.id, {
-          text: '⚠️ Please add at least 1 token to your watchlist first!',
+          text: '⚠️ Tambahkan minimal 1 token ke watchlist terlebih dahulu!',
           show_alert: true
         });
       }
@@ -230,7 +240,7 @@ class CallbackHandler {
       const alertsToday = user.alertCount || 0;
 
       return this.editMsg(chatId, msgId,
-        `📊 <b>Dashboard</b>\n━━━━━━━━━━━━━━\n📡 Bot Status: <b>Online</b>\n👥 Subscribers: <b>${stats.active}</b>\n👀 Tracked Tokens: <b>${tokenCount}</b>\n🚨 Alerts Today: <b>${alertsToday}</b>\n━━━━━━━━━━━━━━\n\n✅ <b>Tracking is now ACTIVE</b>. You will receive real-time whale alerts.`,
+        `📊 <b>Dashboard</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n📡 Status Bot: <b>Online</b>\n👥 Subscriber Aktif: <b>${stats.active}</b>\n👀 Token Dipantau: <b>${tokenCount}</b>\n🔔 Alert Hari Ini: <b>${alertsToday}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n✅ <b>Tracking AKTIF</b>. Anda akan menerima notifikasi whale secara real-time.`,
         this.menus.buildDashboardMenu(user)
       );
     }
@@ -244,7 +254,7 @@ class CallbackHandler {
       const alertsToday = user.alertCount || 0;
 
       return this.editMsg(chatId, msgId,
-        `📊 <b>Dashboard</b>\n━━━━━━━━━━━━━━\n📡 Bot Status: <b>Online</b>\n👥 Subscribers: <b>${stats.active}</b>\n👀 Tracked Tokens: <b>${tokenCount}</b>\n🚨 Alerts Today: <b>${alertsToday}</b>\n━━━━━━━━━━━━━━\n\n⏸ <b>Tracking is PAUSED</b>. Alerts will not be sent until you start tracking again.`,
+        `📊 <b>Dashboard</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n📡 Status Bot: <b>Online</b>\n👥 Subscriber Aktif: <b>${stats.active}</b>\n👀 Token Dipantau: <b>${tokenCount}</b>\n🔔 Alert Hari Ini: <b>${alertsToday}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n⏸ <b>Tracking DIHENTIKAN</b>. Anda tidak akan menerima notifikasi.`,
         this.menus.buildDashboardMenu(user)
       );
     }

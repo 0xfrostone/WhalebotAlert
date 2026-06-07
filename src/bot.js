@@ -96,10 +96,10 @@ class InteractiveWhaleBot {
           { text: '📊 Dashboard', callback_data: 'nav_dashboard' }
         ],
         [
-          { text: '⚙️ Settings', callback_data: 'nav_settings' }
+          { text: '⚙️ Pengaturan', callback_data: 'nav_settings' }
         ],
         [
-          { text: '❓ Help', callback_data: 'nav_help' }
+          { text: '❓ Bantuan', callback_data: 'nav_help' }
         ]
       ]
     };
@@ -107,14 +107,14 @@ class InteractiveWhaleBot {
 
   buildDashboardMenu(user) {
     const trackingBtn = user.active 
-      ? { text: '⏹ Stop Tracking', callback_data: 'tracking_stop' }
-      : { text: '▶️ Start Tracking', callback_data: 'tracking_start' };
+      ? { text: '⏹️ Hentikan Tracking', callback_data: 'tracking_stop' }
+      : { text: '▶️ Mulai Tracking', callback_data: 'tracking_start' };
 
     return {
       inline_keyboard: [
         [ trackingBtn ],
-        [ { text: '📜 Alert History', callback_data: 'research_alerts_list' } ],
-        [ { text: '⬅️ Back', callback_data: 'nav_main' } ]
+        [ { text: '📜 Riwayat Alert', callback_data: 'research_alerts_list' } ],
+        [ { text: '⬅️ Kembali', callback_data: 'nav_main' } ]
       ]
     };
   }
@@ -124,8 +124,8 @@ class InteractiveWhaleBot {
       inline_keyboard: [
         [ { text: '👀 Watchlist', callback_data: 'nav_watchlist' } ],
         [ { text: '🎯 Threshold', callback_data: 'nav_threshold' } ],
-        [ { text: '⚠️ Risk Filter', callback_data: 'nav_risk' } ],
-        [ { text: '⬅️ Back', callback_data: 'nav_main' } ]
+        [ { text: '⚠️ Filter Risiko', callback_data: 'nav_risk' } ],
+        [ { text: '⬅️ Kembali', callback_data: 'nav_main' } ]
       ]
     };
   }
@@ -134,22 +134,20 @@ class InteractiveWhaleBot {
     return {
       inline_keyboard: [
         [
-          { text: '➕ Add Token', callback_data: 'menu_add_token' },
-          { text: '➖ Remove Token', callback_data: 'menu_remove_token' }
+          { text: '➕ Tambah Token', callback_data: 'menu_add_token' },
+          { text: '➖ Hapus Token', callback_data: 'menu_remove_token' }
         ],
-        [ { text: '📋 View Watchlist', callback_data: 'menu_my_watchlist' } ],
-        [ { text: '⬅️ Back', callback_data: 'nav_settings' } ]
+        [ { text: '📋 Lihat Watchlist', callback_data: 'menu_my_watchlist' } ],
+        [ { text: '⬅️ Kembali', callback_data: 'nav_settings' } ]
       ]
     };
   }
 
   buildThresholdMenu() {
-    // Current threshold is handled by text, menu just provides the input options
-    // To match user request, we link to the existing threshold input system but clean up the menu
     return {
       inline_keyboard: [
-        [ { text: '💰 Set Min USD', callback_data: 'menu_threshold_usd' } ], // Note: Existing is just 'menu_threshold'
-        [ { text: '⬅️ Back', callback_data: 'nav_settings' } ]
+        [ { text: '💰 Set Min USD', callback_data: 'menu_threshold_usd' } ],
+        [ { text: '⬅️ Kembali', callback_data: 'nav_settings' } ]
       ]
     };
   }
@@ -157,10 +155,10 @@ class InteractiveWhaleBot {
   buildRiskFilterMenu() {
     return {
       inline_keyboard: [
-        [ { text: '🟢 Conservative', callback_data: 'risk_conservative' } ],
-        [ { text: '🟡 Balanced', callback_data: 'risk_balanced' } ],
-        [ { text: '🔴 Aggressive', callback_data: 'risk_aggressive' } ],
-        [ { text: '⬅️ Back', callback_data: 'nav_settings' } ]
+        [ { text: '🟢 Konservatif', callback_data: 'risk_conservative' } ],
+        [ { text: '🟡 Seimbang', callback_data: 'risk_balanced' } ],
+        [ { text: '🔴 Agresif', callback_data: 'risk_aggressive' } ],
+        [ { text: '⬅️ Kembali', callback_data: 'nav_settings' } ]
       ]
     };
   }
@@ -168,7 +166,7 @@ class InteractiveWhaleBot {
   buildHelpMenu() {
     return {
       inline_keyboard: [
-        [ { text: '⬅️ Back', callback_data: 'nav_main' } ]
+        [ { text: '⬅️ Kembali', callback_data: 'nav_main' } ]
       ]
     };
   }

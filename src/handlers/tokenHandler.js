@@ -5,7 +5,8 @@ const { THRESHOLDS } = require('../config/thresholds');
 
 class TokenHandler {
   static buildMenu(user) {
-    const c = (t) => user.tokens.has(t) ? '✅' : '⬜';
+    const tokens = user.tokens || [];
+    const c = (t) => tokens.includes(t) ? '✅' : '⬜';
     return {
       inline_keyboard: [
         [
@@ -26,27 +27,34 @@ class TokenHandler {
         ],
         [
           { text: '✔️ Simpan', callback_data: 'token_confirm' },
-          { text: '← Kembali', callback_data: 'menu_back' }
+          { text: '← Kembali', callback_data: 'nav_watchlist' }
         ]
       ]
     };
   }
 
   static handleToggle(user, token) {
-    user.tokens.has(token) ? user.tokens.delete(token) : user.tokens.add(token);
+    if (!user.tokens) user.tokens = [];
+    const index = user.tokens.indexOf(token);
+    if (index > -1) {
+      user.tokens.splice(index, 1);
+    } else {
+      user.tokens.push(token);
+    }
   }
 
   static handleSelectAll(user) {
-    user.tokens = new Set(['UNI', 'LINK', 'PEPE']);
+    user.tokens = ['UNI', 'LINK', 'PEPE'];
   }
 
   static handleSelectNone(user) {
-    user.tokens = new Set();
+    user.tokens = [];
   }
 
   static getSelectedText(user) {
-    return user.tokens.size
-      ? [...user.tokens].map(t => `<b>$${t}</b>`).join(', ')
+    const tokens = user.tokens || [];
+    return tokens.length
+      ? tokens.map(t => `<b>$${t}</b>`).join(', ')
       : '<i>Tidak ada</i>';
   }
 }
