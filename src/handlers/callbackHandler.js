@@ -3,7 +3,6 @@
 
 const { TokenHandler } = require('./tokenHandler');
 const { ThresholdHandler } = require('./thresholdHandler');
-const { RiskHandler } = require('./riskHandler');
 const { ChartHandler } = require('./chartHandler');
 const { SETTINGS } = require('../config/settings');
 const { logAdmin } = require('../utils/logger');
@@ -81,13 +80,6 @@ class CallbackHandler {
       );
     }
 
-    if (data === 'nav_risk') {
-      const labels = { ALL: 'Conservative', HIGH_EXTREME: 'Balanced', EXTREME_ONLY: 'Aggressive' };
-      return this.editMsg(chatId, msgId,
-        `⚠️ <b>Risk Filter</b>\n\nCurrent Risk Level: <b>${labels[user.riskFilter || 'ALL']}</b>\n\nChoose the minimum risk alert level to receive:`,
-        this.menus.buildRiskFilterMenu()
-      );
-    }
 
     if (data === 'nav_help') {
       return this.editMsg(chatId, msgId,
@@ -178,13 +170,6 @@ class CallbackHandler {
       );
     }
 
-    if (data === 'menu_risk') {
-      const labels = { ALL: 'Semua', HIGH_EXTREME: 'HIGH & EXTREME', EXTREME_ONLY: 'EXTREME saja' };
-      return this.editMsg(chatId, msgId,
-        `🔔 <b>Filter Level Risiko</b>\n\nFilter aktif: <b>${labels[user.riskFilter]}</b>\n\nPilih level risiko yang ingin kamu terima:`,
-        RiskHandler.buildMenu(user)
-      );
-    }
 
     if (data === 'menu_status') {
       return this.handleStatus(chatId, msgId, user);
@@ -215,24 +200,6 @@ class CallbackHandler {
       );
     }
 
-    // ——— RISK HANDLERS ———
-    if (data.startsWith('risk_') && data !== 'risk_confirm') {
-      const riskVal = data.replace('risk_', '');
-      RiskHandler.handleSelect(user, riskVal);
-      this.subscribers.set(chatId, user);
-      return this.bot.editMessageReplyMarkup(
-        RiskHandler.buildMenu(user),
-        { chat_id: chatId, message_id: msgId }
-      ).catch(() => {});
-    }
-
-    if (data === 'risk_confirm') {
-      this.subscribers.set(chatId, user);
-      return this.editMsg(chatId, msgId,
-        `✅ <b>Filter Risiko Tersimpan!</b>\n\nFilter aktif: <b>${RiskHandler.getLabelText(user.riskFilter)}</b>\n\nKembali ke menu utama:`,
-        this.menus.buildMainMenu(user, this.maintenance)
-      );
-    }
 
     // ——— TRACKING HANDLERS ———
     if (data === 'tracking_start') {

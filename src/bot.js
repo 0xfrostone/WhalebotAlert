@@ -13,7 +13,6 @@ const { setupStatusCommand } = require('./commands/status');
 const { setupMaintenanceCommand } = require('./commands/maintenance');
 const { TokenHandler } = require('./handlers/tokenHandler');
 const { ThresholdHandler } = require('./handlers/thresholdHandler');
-const { RiskHandler } = require('./handlers/riskHandler');
 const { createStatusIcon, formatUSDLog, debugFormatUSD } = require('./utils/formatter');
 const { ResearchHandler } = require('./handlers/researchHandler');
 const { setupResearchCommand } = require('./commands/research');
@@ -49,7 +48,6 @@ class InteractiveWhaleBot {
       buildSettingsMenu: this.buildSettingsMenu.bind(this),
       buildWatchlistMenu: this.buildWatchlistMenu.bind(this),
       buildThresholdMenu: this.buildThresholdMenu.bind(this),
-      buildRiskFilterMenu: this.buildRiskFilterMenu.bind(this),
       buildHelpMenu: this.buildHelpMenu.bind(this)
     };
 
@@ -197,7 +195,6 @@ class InteractiveWhaleBot {
       inline_keyboard: [
         [ { text: '👀 Watchlist', callback_data: 'nav_watchlist' } ],
         [ { text: '🎯 Threshold', callback_data: 'nav_threshold' } ],
-        [ { text: '⚠️ Filter Risiko', callback_data: 'nav_risk' } ],
         [ { text: '⬅️ Kembali', callback_data: 'nav_main' } ]
       ]
     };
@@ -225,16 +222,6 @@ class InteractiveWhaleBot {
     };
   }
 
-  buildRiskFilterMenu() {
-    return {
-      inline_keyboard: [
-        [ { text: '🟢 Konservatif', callback_data: 'risk_conservative' } ],
-        [ { text: '🟡 Seimbang', callback_data: 'risk_balanced' } ],
-        [ { text: '🔴 Agresif', callback_data: 'risk_aggressive' } ],
-        [ { text: '⬅️ Kembali', callback_data: 'nav_settings' } ]
-      ]
-    };
-  }
 
   buildHelpMenu() {
     return {
@@ -256,7 +243,7 @@ class InteractiveWhaleBot {
     let filtered = 0;
     let totalSubs = 0;
 
-    console.log(`\n🔊 [BROADCAST] Starting for ${tokenSymbol} ${alertData.direction} | USD: ${formatUSDLog(usdValue)} | Risk: ${riskCategory}`);
+    console.log(`\n🔊 [BROADCAST] Starting for ${tokenSymbol} ${alertData.direction} | USD: ${formatUSDLog(usdValue)}`);
     
     // === DEBUG: Dump subscriber state ===
     const allSubs = this.watchlistStore.getAllActiveSubscribers();
@@ -269,7 +256,7 @@ class InteractiveWhaleBot {
     // Log ringkasan setiap subscriber sebelum filtering
     for (const user of allSubs) {
       const tokensArr = user.tokens || [];
-      console.log(`   👤 Sub ${user.chatId} (${user.name}): active=${user.active} | tokens=[${tokensArr.join(',')}] | threshold=${user.threshold} | riskFilter=${user.riskFilter}`);
+      console.log(`   👤 Sub ${user.chatId} (${user.name}): active=${user.active} | tokens=[${tokensArr.join(',')}] | threshold=${user.threshold}`);
     }
     console.log(`   ---`);
 
@@ -303,18 +290,6 @@ class InteractiveWhaleBot {
       }
       console.log(`   ✅ [F3-THRESHOLD] ${chatId} (${user.name}): ${debugFormatUSD(usdValue, user.threshold)}`);
 
-      // === FILTER: risk level ===
-      if (user.riskFilter === 'EXTREME_ONLY' && riskCategory !== 'EXTREME') {
-        filtered++;
-        console.log(`   ❌ [F4-RISK] Skip ${chatId} (${user.name}): riskFilter=${user.riskFilter} but alert is ${riskCategory}`);
-        continue;
-      }
-      if (user.riskFilter === 'HIGH_EXTREME' && !['HIGH', 'EXTREME'].includes(riskCategory)) {
-        filtered++;
-        console.log(`   ❌ [F4-RISK] Skip ${chatId} (${user.name}): riskFilter=${user.riskFilter} but alert is ${riskCategory}`);
-        continue;
-      }
-      console.log(`   ✅ [F4-RISK] ${chatId} (${user.name}): riskFilter=${user.riskFilter} accepts ${riskCategory}`);
 
       // === ALL FILTERS PASSED — SEND MESSAGE ===
       try {
@@ -347,7 +322,7 @@ class InteractiveWhaleBot {
       }
     }
 
-    console.log(`\n📱 [BROADCAST RESULT] Sent: ${sent}/${totalSubs} | Filtered: ${filtered} | Token: ${tokenSymbol} | USD: ${formatUSDLog(usdValue)} | Risk: ${riskCategory}`);
+    console.log(`\n📱 [BROADCAST RESULT] Sent: ${sent}/${totalSubs} | Filtered: ${filtered} | Token: ${tokenSymbol} | USD: ${formatUSDLog(usdValue)}`);
     if (sent > 0) {
       this.watchlistStore.save();
       console.log(`   💾 Subscriber data saved (alertCount updated)`);
