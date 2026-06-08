@@ -1,35 +1,21 @@
 // src/storage/alertStore.js
 // Manajemen penyimpanan whale alerts untuk keperluan research
 
-const fs = require('fs');
-const path = require('path');
 const { Parser } = require('json2csv');
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const ALERTS_JSON_FILE = path.join(DATA_DIR, 'alerts.json');
-const ALERTS_CSV_FILE = path.join(DATA_DIR, 'alerts.csv');
+const StorageManager = require('./StorageManager');
 
 class AlertStore {
   constructor() {
-    this.ensureDataDir();
     this.alerts = this.loadAlerts();
     this.updateStatistics();
   }
 
-  ensureDataDir() {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
+  loadAlerts() {
+    return StorageManager.readJSON('alerts.json', []);
   }
 
-  loadAlerts() {
-    try {
-      if (!fs.existsSync(ALERTS_JSON_FILE)) return [];
-      return JSON.parse(fs.readFileSync(ALERTS_JSON_FILE, 'utf8'));
-    } catch (err) {
-      console.error('Error loading alerts:', err.message);
-      return [];
-    }
+  save() {
+    StorageManager.writeJSON('alerts.json', this.alerts);
   }
 
   saveAlert(alertData) {
@@ -75,80 +61,13 @@ class AlertStore {
       this.alerts = this.alerts.slice(0, 5000);
     }
 
-    this.saveToJSON();
-    this.saveToCSV();
+    this.save();
     this.updateStatistics();
 
     return record;
   }
 
-  saveToJSON() {
-    try {
-      fs.writeFileSync(
-        ALERTS_JSON_FILE,
-        JSON.stringify(this.alerts, null, 2)
-      );
-    } catch (err) {
-      console.error('Error saving alerts to JSON:', err.message);
-    }
-  }
 
-  saveToCSV() {
-    try {
-      // Flatten the structure for CSV
-      const csvData = this.alerts.map(alert => ({
-        id: alert.id,
-        timestamp: alert.timestamp,
-        dateTime: alert.dateTime,
-        token: alert.token,
-        transactionType: alert.transactionType,
-        valueUSD: alert.valueUSD,
-        valueETH: alert.valueETH,
-        whaleScore: alert.whaleScore,
-        txSizeScore: alert.whaleScoreBreakdown.txSize,
-        lpImpactScore: alert.whaleScoreBreakdown.lpImpact,
-        walletRepScore: alert.whaleScoreBreakdown.walletRep,
-        frequencyScore: alert.whaleScoreBreakdown.frequency,
-        smartMoneyScore: alert.whaleScoreBreakdown.smartMoney,
-        riskCategory: alert.riskCategory,
-        liquidityImpactPct: alert.liquidityImpactPct,
-        poolTVL: alert.poolTVL,
-        walletAddress: alert.walletAddress,
-        txHash: alert.txHash,
-        dex: alert.dex,
-        tokenIn: alert.tokenIn,
-        tokenOut: alert.tokenOut,
-        amountIn: alert.amountIn,
-        amountOut: alert.amountOut,
-        tokenPrice: alert.tokenPrice,
-        ethPrice: alert.ethPrice,
-        poolVersion: alert.metadata.poolVersion,
-      }));
-
-      if (csvData.length === 0) {
-        // Create header even if no data
-        const header = 'id,timestamp,dateTime,token,transactionType,valueUSD,valueETH,whaleScore,' +
-          'txSizeScore,lpImpactScore,walletRepScore,frequencyScore,smartMoneyScore,riskCategory,' +
-          'liquidityImpactPct,poolTVL,walletAddress,txHash,dex,tokenIn,tokenOut,amountIn,amountOut,' +
-          'tokenPrice,ethPrice,poolVersion\n';
-        fs.writeFileSync(ALERTS_CSV_FILE, header);
-      } else {
-        const parser = new Parser({
-          fields: [
-            'id', 'timestamp', 'dateTime', 'token', 'transactionType', 'valueUSD', 'valueETH',
-            'whaleScore', 'txSizeScore', 'lpImpactScore', 'walletRepScore', 'frequencyScore',
-            'smartMoneyScore', 'riskCategory', 'liquidityImpactPct', 'poolTVL', 'walletAddress',
-            'txHash', 'dex', 'tokenIn', 'tokenOut', 'amountIn', 'amountOut', 'tokenPrice',
-            'ethPrice', 'poolVersion'
-          ]
-        });
-        const csv = parser.parse(csvData);
-        fs.writeFileSync(ALERTS_CSV_FILE, csv);
-      }
-    } catch (err) {
-      console.error('Error saving alerts to CSV:', err.message);
-    }
-  }
 
   updateStatistics() {
     let highestVolume = 0;

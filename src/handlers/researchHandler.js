@@ -253,24 +253,19 @@ class ResearchHandler {
         return;
       }
 
-      // Generate CSV content
-      const csv = CSVExporter.alertsToCSV(recentAlerts);
-
-      // Save to temporary file
+      // Generate XLSX content
+      const { ExcelExporter } = require('../utils/excelExporter');
       const StorageManager = require('../storage/StorageManager');
-      const timestamp = new Date().toISOString().split('T')[0];
-      const fileName = `whale_alerts_export_${timestamp}.csv`;
-      const filePath = StorageManager.getExportsPath(fileName);
-
-      fs.writeFileSync(filePath, csv, 'utf8');
+      const rs = StorageManager.readJSON('research_stats.json', {});
+      const filePath = ExcelExporter.generateResearchReport(recentAlerts, rs);
 
       // Send file to user
       await this.bot.sendDocument(chatId, filePath, {
-        caption: `📊 <b>Export Data Penelitian</b>\n\n` +
+        caption: `📊 <b>Export Data Penelitian (XLSX)</b>\n\n` +
                 `Total Records: ${recentAlerts.length}\n` +
-                `Format: CSV\n` +
+                `Format: XLSX\n` +
                 `Tanggal: ${new Date().toLocaleString('id-ID')}\n\n` +
-                `File siap digunakan untuk analisis BAB 4 skripsi.`,
+                `Laporan siap digunakan untuk analisis BAB 4 skripsi.`,
         parse_mode: 'HTML'
       });
 

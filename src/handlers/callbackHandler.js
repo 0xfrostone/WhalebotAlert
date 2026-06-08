@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const StorageManager = require('../storage/StorageManager');
 const { TokenHandler } = require('./tokenHandler');
 const { ThresholdHandler } = require('./thresholdHandler');
 const { ChartHandler } = require('./chartHandler');
@@ -156,44 +157,12 @@ class CallbackHandler {
           return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
         }
 
-        let csvContent = 'No,Date,Time,Token,Action,Transaction Value (USD),Token Amount,Whale Score,Liquidity Impact (%),DEX,Wallet Address,Transaction Hash\n';
-        
-        // Reverse array to start from oldest (index 1) to newest
-        const sortedAlerts = [...alerts].reverse();
+        const { ExcelExporter } = require('../utils/excelExporter');
+        const rs = this.appBot.researchStore.getStats();
+        const filePath = ExcelExporter.generateResearchReport(alerts, rs);
 
-        sortedAlerts.forEach((a, i) => {
-          const dateObj = new Date(a.timestamp);
-          const dateStr = dateObj.toISOString().split('T')[0];
-          const timeStr = dateObj.toTimeString().split(' ')[0];
-          
-          const token = a.tokenSymbol;
-          const action = a.direction;
-          const usd = (a.usdValue || 0).toFixed(2);
-          
-          // Token amount extraction
-          let tokenAmountStr = '0';
-          if (action === 'BUY' && a.amountOut) {
-            tokenAmountStr = Number(a.amountOut).toFixed(2);
-          } else if (action === 'SELL' && a.amountIn) {
-            tokenAmountStr = Number(a.amountIn).toFixed(2);
-          }
-          
-          const score = a.whaleScore.total;
-          const impact = (a.liquidityImpact * 100).toFixed(4);
-          const dex = a.pool ? a.pool.dex : '-';
-          const wallet = a.wallet;
-          const txHash = a.txHash || '-';
-          
-          csvContent += `${i + 1},${dateStr},${timeStr},${token},${action},${usd},${tokenAmountStr},${score},${impact},${dex},${wallet},${txHash}\n`;
-        });
-
-        const today = new Date().toISOString().split('T')[0];
-        const filename = `whale_research_dataset_${today}.csv`;
-        const csvPath = StorageManager.getResearchPath(filename);
-        fs.writeFileSync(csvPath, csvContent, 'utf8');
-
-        await this.bot.sendDocument(chatId, csvPath, {
-          caption: '📄 <b>Dataset Penelitian</b>\n\nSeluruh data transaksi whale mentah untuk analisis.',
+        await this.bot.sendDocument(chatId, filePath, {
+          caption: '📊 <b>Dataset & Ringkasan Penelitian</b>\n\nSeluruh data transaksi whale mentah dan statistik analisis dalam format Excel (XLSX).',
           parse_mode: 'HTML'
         });
         
@@ -208,92 +177,23 @@ class CallbackHandler {
       if (!isAdmin) return this.bot.answerCallbackQuery(query.id, { text: 'Akses ditolak', show_alert: true });
       
       try {
-        const rs = this.appBot.researchStore.getStats();
+        const StorageManager = require('../storage/StorageManager');
         const alerts = StorageManager.readJSON('alerts.json', []);
-
-        const startDate = new Date(rs.monitoring_start_date).toLocaleString('id-ID');
-        const lastDate = new Date().toLocaleString('id-ID');
-        const uptimeH = ((Date.now() - new Date(rs.monitoring_start_date).getTime()) / 3_600_000).toFixed(1);
-        const uptimeD = (uptimeH / 24).toFixed(1);
-
-        let csvContent = 'Monitoring Information\n';
-        csvContent += `Monitoring Start,${startDate}\n`;
-        csvContent += `Monitoring End,${lastDate}\n`;
-        csvContent += `Monitoring Duration,${uptimeH} Hours (${uptimeD} Days)\n\n`;
-
-        csvContent += 'Whale Detection Summary\n';
-        csvContent += `Total Events Received,${rs.total_events}\n`;
-        csvContent += `Total Whale Detected,${rs.total_whale_alerts}\n`;
-        csvContent += `Total Alerts Sent,${rs.total_alerts_sent}\n`;
-        csvContent += `BUY Count,${rs.buy_count}\n`;
-        csvContent += `SELL Count,${rs.sell_count}\n\n`;
-
-        csvContent += 'Token Activity Summary\n';
-        csvContent += 'Token,BUY,SELL,TOTAL\n';
-        let mostActiveToken = { name: '-', count: 0 };
-        if (rs.token_stats && Object.keys(rs.token_stats).length > 0) {
-          for (const [sym, stats] of Object.entries(rs.token_stats)) {
-            const total = stats.BUY + stats.SELL;
-            if (total > mostActiveToken.count) {
-              mostActiveToken = { name: sym, count: total };
-            }
-            csvContent += `${sym},${stats.BUY},${stats.SELL},${total}\n`;
-          }
+        
+        if (alerts.length === 0) {
+          return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
         }
-        csvContent += '\n';
 
-        csvContent += 'Largest Transactions (Top 10)\n';
-        csvContent += 'Rank,Date,Token,Action,Value (USD),Whale Score\n';
-        const sortedAlerts = [...alerts].sort((a, b) => (b.usdValue || 0) - (a.usdValue || 0)).slice(0, 10);
-        sortedAlerts.forEach((a, i) => {
-          const dateStr = new Date(a.timestamp).toLocaleString('id-ID');
-          const token = a.tokenSymbol;
-          const action = a.direction;
-          const usd = (a.usdValue || 0).toFixed(2);
-          const score = a.whaleScore.total;
-          csvContent += `${i + 1},${dateStr},${token},${action},${usd},${score}\n`;
-        });
-        csvContent += '\n';
+        const { ExcelExporter } = require('../utils/excelExporter');
+        const rs = this.appBot.researchStore.getStats();
+        const filePath = ExcelExporter.generateResearchReport(alerts, rs);
 
-        const highestScore = alerts.length > 0 ? Math.max(...alerts.map(a => a.whaleScore.total)) : 0;
-        const avgScore = rs.average_score.toFixed(1);
-        const highestImpact = alerts.length > 0 ? Math.max(...alerts.map(a => a.liquidityImpact)) : 0;
-        const avgImpact = rs.average_impact;
-        const avgValue = rs.total_whale_alerts > 0 ? (alerts.reduce((acc, a) => acc + (a.usdValue||0), 0) / rs.total_whale_alerts) : 0;
-
-        csvContent += 'Whale Metrics\n';
-        csvContent += `Average Whale Score,${avgScore}\n`;
-        csvContent += `Highest Whale Score,${highestScore}\n`;
-        csvContent += `Average Liquidity Impact (%),${(avgImpact * 100).toFixed(4)}%\n`;
-        csvContent += `Highest Liquidity Impact (%),${(highestImpact * 100).toFixed(4)}%\n`;
-        csvContent += `Average Transaction Value (USD),${avgValue.toFixed(2)}\n`;
-        csvContent += `Highest Transaction Value (USD),${(rs.highest_transaction.amount || 0).toFixed(2)}\n\n`;
-
-        csvContent += 'Most Active Token\n';
-        csvContent += `Token Name,${mostActiveToken.name}\n`;
-        csvContent += `Total Transactions,${mostActiveToken.count}\n`;
-        const activePct = rs.total_whale_alerts > 0 ? ((mostActiveToken.count / rs.total_whale_alerts) * 100).toFixed(2) : 0;
-        csvContent += `Percentage Contribution,${activePct}%\n\n`;
-
-        const totalWatchlistTokens = Object.keys(this.appBot.tokenService?.tokenStore?.data || {}).length;
-        const avgAlertsDay = uptimeD > 0 ? (rs.total_alerts_sent / uptimeD).toFixed(2) : 0;
-
-        csvContent += 'System Performance\n';
-        csvContent += `Monitoring Uptime,${uptimeH} Hours\n`;
-        csvContent += `Total Watchlist Tokens,${totalWatchlistTokens}\n`;
-        csvContent += `Average Alerts Per Day,${avgAlertsDay}\n`;
-
-        const today = new Date().toISOString().split('T')[0];
-        const filename = `whale_research_summary_${today}.csv`;
-        const csvPath = StorageManager.getResearchPath(filename);
-        fs.writeFileSync(csvPath, csvContent, 'utf8');
-
-        await this.bot.sendDocument(chatId, csvPath, {
-          caption: '📊 <b>Ringkasan Penelitian</b>\n\nExecutive summary yang siap disajikan untuk laporan Bab 4.',
+        await this.bot.sendDocument(chatId, filePath, {
+          caption: '📊 <b>Dataset & Ringkasan Penelitian</b>\n\nLaporan komprehensif berisi statistik, aktivitas token, dan dataset (XLSX).',
           parse_mode: 'HTML'
         });
         
-        return this.bot.answerCallbackQuery(query.id, { text: 'Summary berhasil dikirim!', show_alert: false });
+        return this.bot.answerCallbackQuery(query.id, { text: 'Ringkasan berhasil dikirim!', show_alert: false });
       } catch (err) {
         console.error('Export Summary error:', err);
         return this.bot.sendMessage(chatId, `❌ Gagal export summary: ${err.message}`);
