@@ -4,21 +4,41 @@ const StorageManager = require('../storage/StorageManager');
 const path = require('path');
 
 class ExcelExporter {
-  static generateResearchReport(alerts, stats) {
+  static generateResearchReport(rawAlerts, stats) {
     const workbook = XLSX.utils.book_new();
+
+    // Normalize alerts to ensure compatibility between old and new JSON structures
+    const alerts = rawAlerts.map(alert => {
+      const dateTimeStr = alert.dateTime || (alert.timestamp ? new Date(alert.timestamp).toLocaleString('id-ID') : 'Unknown');
+      return {
+        ...alert,
+        dateTimeStr: dateTimeStr,
+        dateOnly: dateTimeStr.split(' ')[0] || '',
+        timeOnly: dateTimeStr.split(' ')[1] || '',
+        token: alert.token || alert.tokenSymbol || 'UNKNOWN',
+        transactionType: alert.transactionType || alert.direction || 'UNKNOWN',
+        valueUSD: alert.valueUSD || 0,
+        valueETH: alert.valueETH || alert.amountIn || alert.amountOut || 0,
+        whaleScore: alert.whaleScore?.total !== undefined ? alert.whaleScore.total : (alert.whaleScore || 0),
+        liquidityImpactPct: alert.liquidityImpactPct || alert.liquidityImpact || 0,
+        dex: alert.dex || alert.pool?.dex || 'UNKNOWN',
+        walletAddress: alert.walletAddress || alert.wallet || 'UNKNOWN',
+        txHash: alert.txHash || 'N/A'
+      };
+    });
 
     // 1. Sheet: Dataset Penelitian
     const datasetData = alerts.map((alert, index) => ({
       'No': index + 1,
-      'Date': alert.dateTime.split(' ')[0],
-      'Time': alert.dateTime.split(' ')[1] || '',
+      'Date': alert.dateOnly,
+      'Time': alert.timeOnly,
       'Token': alert.token,
       'Action': alert.transactionType,
       'Transaction Value (USD)': alert.valueUSD,
-      'Token Amount': alert.valueETH, // Actually token amount, but legacy variable is valueETH
+      'Token Amount': alert.valueETH,
       'Whale Score': alert.whaleScore,
       'Liquidity Impact (%)': alert.liquidityImpactPct,
-      'DEX': alert.dex || 'UNKNOWN',
+      'DEX': alert.dex,
       'Wallet Address': alert.walletAddress,
       'Transaction Hash': alert.txHash
     }));
@@ -105,7 +125,7 @@ class ExcelExporter {
     const top10 = [...alerts].sort((a, b) => (b.valueUSD || 0) - (a.valueUSD || 0)).slice(0, 10);
     const top10Data = top10.map((alert, index) => ({
       Rank: index + 1,
-      Date: alert.dateTime,
+      Date: alert.dateTimeStr,
       Token: alert.token,
       Action: alert.transactionType,
       'USD Value': alert.valueUSD,
