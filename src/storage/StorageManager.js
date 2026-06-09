@@ -60,20 +60,6 @@ class StorageManager {
 
   // --- Specific Helpers for Phase 1 ---
 
-  static loadSubscribers() {
-    return this.readJSON('subscribers.json', {});
-  }
-  static saveSubscribers(data) {
-    this.writeJSON('subscribers.json', data);
-  }
-
-  static loadWatchlists() {
-    return this.readJSON('watchlists.json', {});
-  }
-  static saveWatchlists(data) {
-    this.writeJSON('watchlists.json', data);
-  }
-
   static loadTokens() {
     return this.readJSON('tokens.json', {});
   }
@@ -81,11 +67,41 @@ class StorageManager {
     this.writeJSON('tokens.json', data);
   }
 
-  static loadAlerts() {
-    return this.readJSON('alerts.json', []);
+  // --- Multi-User Storage Helpers (Phase 2+) ---
+
+  static getUserDir(userId) {
+    const userDir = path.join(STORAGE_DIR, 'users', String(userId));
+    this.ensureDir(userDir);
+    return userDir;
   }
-  static saveAlerts(data) {
-    this.writeJSON('alerts.json', data);
+
+  static getUserFilePath(userId, filename) {
+    const userDir = this.getUserDir(userId);
+    return path.join(userDir, filename);
+  }
+
+  static readUserJSON(userId, filename, defaultData = null) {
+    const filePath = this.getUserFilePath(userId, filename);
+    if (!fs.existsSync(filePath)) {
+      return defaultData;
+    }
+    try {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch (err) {
+      console.error(`[StorageManager] Error reading user ${userId} ${filename}:`, err.message);
+      return defaultData;
+    }
+  }
+
+  static writeUserJSON(userId, filename, data) {
+    const filePath = this.getUserFilePath(userId, filename);
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+      return true;
+    } catch (err) {
+      console.error(`[StorageManager] Error writing user ${userId} ${filename}:`, err.message);
+      return false;
+    }
   }
 }
 

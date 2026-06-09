@@ -32,6 +32,7 @@ class TokenService {
   }
 
   async validateAndAddToken(tokenAddress) {
+    console.log(`[TOKEN] Validation Started: ${tokenAddress}`);
     try {
       if (!ethers.isAddress(tokenAddress)) {
         throw new Error('Format alamat ERC-20 tidak valid');
@@ -39,10 +40,20 @@ class TokenService {
 
       const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider);
       
-      const [symbol, decimals] = await Promise.all([
+      const withTimeout = (promise, ms, operationName) => {
+        return Promise.race([
+          promise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout after ${ms}ms during ${operationName}`)), ms))
+        ]);
+      };
+
+      console.log(`[TOKEN] Contract Found. Validating ERC-20 symbol and decimals...`);
+      const symbolAndDecimalsPromise = Promise.all([
         tokenContract.symbol().catch(() => null),
         tokenContract.decimals().catch(() => null)
       ]);
+
+      const [symbol, decimals] = await withTimeout(symbolAndDecimalsPromise, 15000, 'symbol/decimals fetch');
 
       if (!symbol || decimals === null) {
         throw new Error('Kontrak tidak valid atau bukan ERC-20 standard');
@@ -54,7 +65,8 @@ class TokenService {
       if (!tokenData) {
         // Discover Pools
         console.log(`[TokenService] Discovering pools for ${symbol}...`);
-        const pools = await this.discoverPools(tokenAddress, symbol, decimals);
+        const poolsPromise = this.discoverPools(tokenAddress, symbol, decimals);
+        const pools = await withTimeout(poolsPromise, 15000, 'discoverPools fetch');
 
         if (pools.length === 0) {
           throw new Error(`Tidak ditemukan liquidity pool aktif untuk ${symbol}/WETH di Uniswap V2/V3`);
@@ -72,9 +84,10 @@ class TokenService {
         console.log(`[TokenService] Successfully added ${symbol} with ${pools.length} pools`);
       }
 
+      console.log(`[TOKEN] Validation Success: ${symbol}`);
       return { tokenData, isNew };
     } catch (err) {
-      console.error(`[TokenService] Error adding token:`, err.message);
+      console.error(`[TOKEN] Validation Failed: ${err.message}`);
       throw err;
     }
   }

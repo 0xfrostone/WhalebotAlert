@@ -279,6 +279,8 @@ class InteractiveWhaleBot {
     }
     console.log(`   ---`);
 
+    const sentChatIds = [];
+
     for (const user of allSubs) {
       const chatId = user.chatId;
       totalSubs++;
@@ -329,7 +331,7 @@ class InteractiveWhaleBot {
         });
 
         user.alertCount = (user.alertCount || 0) + 1;
-        sent++;
+        sentChatIds.push(chatId);
         console.log(`   ✅ [SENT] Successfully sent to ${chatId} (${user.name}) — alertCount now: ${user.alertCount}`);
       } catch (err) {
         if (err.message.includes('blocked') || err.message.includes('not found')) {
@@ -341,12 +343,12 @@ class InteractiveWhaleBot {
       }
     }
 
-    console.log(`\n📱 [BROADCAST RESULT] Sent: ${sent}/${totalSubs} | Filtered: ${filtered} | Token: ${tokenSymbol} | USD: ${formatUSDLog(usdValue)}`);
-    if (sent > 0) {
+    console.log(`\n📱 [BROADCAST RESULT] Sent: ${sentChatIds.length}/${totalSubs} | Filtered: ${filtered} | Token: ${tokenSymbol} | USD: ${formatUSDLog(usdValue)}`);
+    if (sentChatIds.length > 0) {
       this.watchlistStore.save();
       console.log(`   💾 Subscriber data saved (alertCount updated)`);
     }
-    if (sent === 0 && totalSubs > 0) {
+    if (sentChatIds.length === 0 && totalSubs > 0) {
       console.log(`   ⚠️ Semua subscriber di-filter. Kemungkinan penyebab:`);
       console.log(`      - User tidak active (belum klik "Mulai Tracking")`);
       console.log(`      - Token ${tokenSymbol} tidak ada di watchlist user`);
@@ -357,7 +359,7 @@ class InteractiveWhaleBot {
       console.log(`   → No subscribers yet, use /start to subscribe`);
     }
 
-    return sent;
+    return sentChatIds;
   }
 
   async broadcastAccumulation(accumulationData) {

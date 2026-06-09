@@ -6,7 +6,6 @@ require('dotenv').config();
 const { BlockchainListener }  = require('./src/blockchain/listener');
 const { analyzeSwap }          = require('./src/blockchain/detector');
 const { InteractiveWhaleBot }  = require('./src/bot');
-const { AlertLogger }          = require('./src/services/alertLogger');
 const { AccumulationTracker }  = require('./src/blockchain/accumulationTracker');
 const { BackupService }        = require('./src/services/backupService');
 
@@ -15,14 +14,33 @@ const { BackupService }        = require('./src/services/backupService');
 // ============================================================
 const StorageManager = require('./src/storage/StorageManager');
 
-function saveAlert(alertData) {
-  const alerts = StorageManager.readJSON('alerts.json', []);
-  alerts.unshift({
+function saveUserAlert(chatId, alertData) {
+  // PHASE 6: Validation
+  if (!alertData.tokenSymbol || !alertData.direction || alertData.usdValue === undefined || !alertData.whaleScore || !alertData.timestamp) {
+    console.warn(`[WARNING] Skipping malformed alert record for user ${chatId}`);
+    return;
+  }
+
+  const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
+  
+  // Also clean old corrupted entries silently (Phase 6 cleanup)
+  const cleanedAlerts = alerts.filter(a => a && a.tokenSymbol && a.direction && a.usdValue !== undefined);
+
+  const record = {
     ...alertData,
+    id: cleanedAlerts.length > 0 ? (cleanedAlerts[0].id || cleanedAlerts.length) + 1 : 1,
+    dateTime: new Date(alertData.timestamp).toLocaleString('id-ID'),
+    token: alertData.tokenSymbol,
+    transactionType: alertData.direction,
+    valueUSD: alertData.usdValue,
+    valueETH: alertData.amountIn || alertData.amountOut || 0,
     savedAt: new Date().toISOString()
-  });
-  if (alerts.length > 1000) alerts.splice(1000);
-  StorageManager.writeJSON('alerts.json', alerts);
+  };
+
+  cleanedAlerts.unshift(record);
+  
+  if (cleanedAlerts.length > 1000) cleanedAlerts.splice(1000);
+  StorageManager.writeUserJSON(chatId, 'alerts.json', cleanedAlerts);
 }
 
 function updateWalletStats(address, txData) {
@@ -100,9 +118,6 @@ async function main() {
   const backupService = new BackupService();
   backupService.startCron();
 
-  // Inisialisasi Alert Logger
-  const alertLogger = new AlertLogger();
-
   // Inisialisasi ResearchStore
   const { ResearchStore } = require('./src/storage/researchStore');
   const researchStore = new ResearchStore();
@@ -163,13 +178,14 @@ async function main() {
         // --- 1. WHALE ALERT BROADCAST ---
         stats.alertsSent++;
         console.log(`🚀 Mengirim Whale Alert ke bot...`);
-        const sentCount = await bot.broadcast(result);
-        console.log(`✅ Alert berhasil dikirim ke ${sentCount} user(s)`);
-        researchStore.addAlertsSent(sentCount);
+        const sentChatIds = await bot.broadcast(result);
+        console.log(`✅ Alert berhasil dikirim ke ${sentChatIds.length} user(s)`);
+        researchStore.addAlertsSent(sentChatIds.length);
 
-        // Simpan alert
-        saveAlert(result);
-        alertLogger.logAlert(result);
+        // Simpan alert per user
+        for (const chatId of sentChatIds) {
+          saveUserAlert(chatId, result);
+        }
         researchStore.recordWhale(swapData, result);
         
         // --- 2. ACCUMULATION DETECTION ---

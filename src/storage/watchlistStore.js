@@ -1,65 +1,138 @@
 // src/storage/watchlistStore.js
-const { StoreBase } = require('./storeBase');
+const fs = require('fs');
+const path = require('path');
+const StorageManager = require('./StorageManager');
 
-class WatchlistStore extends StoreBase {
-  constructor() {
-    super('watchlists.json', {});
-  }
+class WatchlistStore {
+  constructor() {}
 
-  getWatchlist(chatId, name = 'User') {
-    if (!this.data[chatId]) {
-      this.data[chatId] = {
+  getSettings(chatId, name = 'User') {
+    let settings = StorageManager.readUserJSON(chatId, 'settings.json');
+    if (!settings) {
+      settings = {
         chatId: chatId,
         name: name,
-        tokens: [], // Default to empty, they must add tokens
         threshold: 50000,
         riskFilter: 'ALL',
         active: false,
         alertCount: 0,
         joinedAt: new Date().toISOString()
       };
-      this.save();
+      StorageManager.writeUserJSON(chatId, 'settings.json', settings);
     }
-    // Update name if it's missing (for older accounts)
-    if (!this.data[chatId].name) {
-      this.data[chatId].name = name;
-      this.save();
-    }
-    return this.data[chatId];
+    return settings;
   }
 
-  saveWatchlist(chatId, data) {
-    this.data[chatId] = {
-      ...this.getWatchlist(chatId),
+  saveSettings(chatId, data) {
+    const settings = {
+      ...this.getSettings(chatId),
       ...data,
       updatedAt: new Date().toISOString()
     };
-    this.save();
+    StorageManager.writeUserJSON(chatId, 'settings.json', settings);
+  }
+
+  getTokens(chatId) {
+    let watchlist = StorageManager.readUserJSON(chatId, 'watchlist.json');
+    if (!watchlist || !Array.isArray(watchlist.tokens)) {
+      watchlist = { tokens: [] };
+      StorageManager.writeUserJSON(chatId, 'watchlist.json', watchlist);
+    }
+    return watchlist.tokens;
+  }
+
+  saveTokens(chatId, tokens) {
+    StorageManager.writeUserJSON(chatId, 'watchlist.json', { tokens });
+  }
+
+  // Compatibility method for bot.js
+  getWatchlist(chatId, name = 'User') {
+    const settings = this.getSettings(chatId, name);
+    const tokens = this.getTokens(chatId);
+    return { ...settings, tokens };
+  }
+
+  // Compatibility method for bot.js
+  set(chatId, userObj) {
+    this.saveSettings(chatId, {
+      name: userObj.name,
+      threshold: userObj.threshold,
+      riskFilter: userObj.riskFilter,
+      active: userObj.active,
+      alertCount: userObj.alertCount
+    });
+    this.saveTokens(chatId, userObj.tokens || []);
+  }
+
+  saveWatchlist(chatId, data) {
+    this.set(chatId, data);
   }
 
   hasToken(chatId, tokenSymbol) {
-    const list = this.getWatchlist(chatId);
-    return list.tokens.includes(tokenSymbol.toUpperCase());
+    const tokens = this.getTokens(chatId);
+    return tokens.includes(tokenSymbol.toUpperCase());
   }
 
   addToken(chatId, tokenSymbol) {
-    const list = this.getWatchlist(chatId);
+    const tokens = this.getTokens(chatId);
     const sym = tokenSymbol.toUpperCase();
-    if (!list.tokens.includes(sym)) {
-      list.tokens.push(sym);
-      this.saveWatchlist(chatId, list);
+    if (!tokens.includes(sym)) {
+      tokens.push(sym);
+      this.saveTokens(chatId, tokens);
     }
   }
 
   removeToken(chatId, tokenSymbol) {
-    const list = this.getWatchlist(chatId);
+    let tokens = this.getTokens(chatId);
     const sym = tokenSymbol.toUpperCase();
-    list.tokens = list.tokens.filter(t => t !== sym);
-    this.saveWatchlist(chatId, list);
+    tokens = tokens.filter(t => t !== sym);
+    this.saveTokens(chatId, tokens);
+  }
+
+  getAll() {
+    const usersDir = path.join(process.cwd(), 'storage', 'users');
+    if (!fs.existsSync(usersDir)) return {};
+
+    const allSubs = {};
+    const dirs = fs.readdirSync(usersDir);
+    
+    for (const dir of dirs) {
+      const chatId = dir;
+      const settings = StorageManager.readUserJSON(chatId, 'settings.json');
+      if (settings) {
+        allSubs[chatId] = settings;
+      }
+    }
+    return allSubs;
   }
 
   getAllActiveSubscribers() {
-    return Object.values(this.data).filter(sub => sub.active);
+    const usersDir = path.join(process.cwd(), 'storage', 'users');
+    if (!fs.existsSync(usersDir)) return [];
+
+    const activeSubs = [];
+    const dirs = fs.readdirSync(usersDir);
+    
+    for (const dir of dirs) {
+      const chatId = dir;
+      const settings = StorageManager.readUserJSON(chatId, 'settings.json');
+      if (settings && settings.active) {
+        const tokens = this.getTokens(chatId);
+        activeSubs.push({ ...settings, tokens });
+      }
+    }
+    return activeSubs;
+  }
+
+  save() {
+    // No-op for global save, we save per user now
+  }
+
+  delete(chatId) {
+    // If blocked or not found, we mark as inactive instead of deleting history
+    const settings = this.getSettings(chatId);
+    settings.active = false;
+    this.saveSettings(chatId, settings);
   }
 }
 

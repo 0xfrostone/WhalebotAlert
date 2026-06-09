@@ -147,11 +147,9 @@ class CallbackHandler {
     }
 
     if (data === 'export_dataset') {
-      if (!isAdmin) return this.bot.answerCallbackQuery(query.id, { text: 'Akses ditolak', show_alert: true });
-      
       try {
         const StorageManager = require('../storage/StorageManager');
-        const alerts = StorageManager.readJSON('alerts.json', []);
+        const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
         
         if (alerts.length === 0) {
           return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
@@ -159,6 +157,8 @@ class CallbackHandler {
 
         const { ExcelExporter } = require('../utils/excelExporter');
         const rs = this.appBot.researchStore.getStats();
+        // Adjust the stats to just represent the user's total alerts for the export header
+        rs.total_alerts_sent = alerts.length;
         const filePath = ExcelExporter.generateResearchReport(alerts, rs);
 
         await this.bot.sendDocument(chatId, filePath, {
@@ -174,11 +174,9 @@ class CallbackHandler {
     }
 
     if (data === 'export_summary') {
-      if (!isAdmin) return this.bot.answerCallbackQuery(query.id, { text: 'Akses ditolak', show_alert: true });
-      
       try {
         const StorageManager = require('../storage/StorageManager');
-        const alerts = StorageManager.readJSON('alerts.json', []);
+        const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
         
         if (alerts.length === 0) {
           return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
@@ -186,6 +184,7 @@ class CallbackHandler {
 
         const { ExcelExporter } = require('../utils/excelExporter');
         const rs = this.appBot.researchStore.getStats();
+        rs.total_alerts_sent = alerts.length;
         const filePath = ExcelExporter.generateResearchReport(alerts, rs);
 
         await this.bot.sendDocument(chatId, filePath, {

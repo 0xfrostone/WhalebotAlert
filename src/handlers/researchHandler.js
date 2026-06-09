@@ -9,7 +9,6 @@ const { formatUSD } = require('../utils/formatter');
 class ResearchHandler {
   constructor(bot) {
     this.bot = bot;
-    this.alertLogger = new AlertLogger();
   }
 
   setup() {
@@ -45,7 +44,8 @@ class ResearchHandler {
 
   async showAlertsList(chatId, messageId) {
     try {
-      const recentAlerts = this.alertLogger.getRecentAlerts(10);
+      const StorageManager = require('../storage/StorageManager');
+      const recentAlerts = StorageManager.readUserJSON(chatId, 'alerts.json', []).slice(0, 10);
 
       if (recentAlerts.length === 0) {
         const text = '📜 <b>RIWAYAT ALERT</b>\n\n❌ Belum ada alert terdeteksi.';
@@ -93,7 +93,8 @@ class ResearchHandler {
 
   async showAlertDetail(chatId, alertId, messageId) {
     try {
-      const recentAlerts = this.alertLogger.getRecentAlerts(100);
+      const StorageManager = require('../storage/StorageManager');
+      const recentAlerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
       const alert = recentAlerts.find(a => a.id === alertId);
 
       if (!alert) {
@@ -156,7 +157,28 @@ class ResearchHandler {
 
   async showStatistics(chatId, messageId) {
     try {
-      const stats = this.alertLogger.getStatistics();
+      const StorageManager = require('../storage/StorageManager');
+      const userAlerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
+      
+      const stats = {
+        totalAlerts: userAlerts.length,
+        tokenFrequency: {},
+        alertsByType: { BUY: 0, SELL: 0 },
+        highestVolumeUSD: 0,
+        avgVolumeUSD: 0
+      };
+
+      let sumUSD = 0;
+      for (const a of userAlerts) {
+        if (a.transactionType === 'BUY') stats.alertsByType.BUY++;
+        else if (a.transactionType === 'SELL') stats.alertsByType.SELL++;
+        
+        stats.tokenFrequency[a.token] = (stats.tokenFrequency[a.token] || 0) + 1;
+        
+        if (a.valueUSD > stats.highestVolumeUSD) stats.highestVolumeUSD = a.valueUSD;
+        sumUSD += (a.valueUSD || 0);
+      }
+      stats.avgVolumeUSD = userAlerts.length > 0 ? (sumUSD / userAlerts.length) : 0;
 
       const sortedTokens = Object.entries(stats.tokenFrequency || {})
         .sort(([, a], [, b]) => b - a)
