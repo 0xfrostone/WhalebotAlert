@@ -234,9 +234,16 @@ class BlockchainListener {
     // Ping setiap 30 detik untuk pastikan koneksi masih hidup
     this.healthCheckInterval = setInterval(async () => {
       try {
-        await this.provider.getBlockNumber();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Health check timeout')), 5000)
+        );
+        // Race the getBlockNumber against the timeout
+        await Promise.race([
+          this.provider.getBlockNumber(),
+          timeoutPromise
+        ]);
       } catch (err) {
-        console.warn('⚠️  Koneksi terputus, reconnecting...');
+        console.warn('⚠️  Koneksi terputus atau timeout, reconnecting...');
         clearInterval(this.healthCheckInterval);
         await this.scheduleReconnect();
       }

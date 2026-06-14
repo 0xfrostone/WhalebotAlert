@@ -331,6 +331,7 @@ class InteractiveWhaleBot {
         });
 
         user.alertCount = (user.alertCount || 0) + 1;
+        this.watchlistStore.saveSettings(chatId, { alertCount: user.alertCount });
         sentChatIds.push(chatId);
         console.log(`   ✅ [SENT] Successfully sent to ${chatId} (${user.name}) — alertCount now: ${user.alertCount}`);
       } catch (err) {
@@ -345,7 +346,6 @@ class InteractiveWhaleBot {
 
     console.log(`\n📱 [BROADCAST RESULT] Sent: ${sentChatIds.length}/${totalSubs} | Filtered: ${filtered} | Token: ${tokenSymbol} | USD: ${formatUSDLog(usdValue)}`);
     if (sentChatIds.length > 0) {
-      this.watchlistStore.save();
       console.log(`   💾 Subscriber data saved (alertCount updated)`);
     }
     if (sentChatIds.length === 0 && totalSubs > 0) {
