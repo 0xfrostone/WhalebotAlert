@@ -374,6 +374,11 @@ class InteractiveWhaleBot {
       
       if (!hasToken) continue;
       
+      const userThreshold = user.threshold || 50000;
+      if (accumulationData.totalVolume < userThreshold) {
+        continue;
+      }
+      
       try {
         const { NotificationService } = require('./services/notifier');
         const message = NotificationService.formatAccumulationAlert(accumulationData);

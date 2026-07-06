@@ -27,13 +27,13 @@ class AccumulationTracker {
     // Add new transaction
     const activity = this.store.addTransaction(wallet, tokenSymbol, direction, {
       usdValue,
-      lpImpactPct
+      lpImpactPct,
+      txHash: swapData.txHash,
+      dex: swapData.pool ? swapData.pool.dex : 'Uniswap'
     });
 
-    // We only analyze if the current transaction's direction matches the activity's main direction
     if (activity.direction !== direction) {
-      // It means they flipped direction, maybe we reset or ignore, but the store handles this simply.
-      // We will only check accumulation for the transactions matching the current direction.
+      // Different direction, just tracking
     }
 
     const recentTxs = activity.transactions;
@@ -54,6 +54,10 @@ class AccumulationTracker {
           riskLevel = 'LOW';
         }
 
+        // Collect txHashes and unique dexes
+        const txHashes = recentTxs.map(tx => tx.txHash).filter(Boolean);
+        const dexes = [...new Set(recentTxs.map(tx => tx.dex).filter(Boolean))];
+
         return {
           isAccumulation: true,
           wallet: wallet,
@@ -63,7 +67,9 @@ class AccumulationTracker {
           totalVolume: totalVolume,
           combinedImpactPct: combinedImpact,
           timeWindow: '1 Hour',
-          riskLevel: riskLevel
+          riskLevel: riskLevel,
+          txHashes: txHashes,
+          dexes: dexes
         };
       }
     }

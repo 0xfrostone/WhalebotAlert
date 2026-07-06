@@ -30,7 +30,9 @@ class AccumulationStore extends StoreBase {
     activity.transactions.push({
       timestamp: Date.now(),
       usdValue: txData.usdValue,
-      impactPct: txData.lpImpactPct
+      impactPct: txData.lpImpactPct,
+      txHash: txData.txHash,
+      dex: txData.dex
     });
 
     this.save();

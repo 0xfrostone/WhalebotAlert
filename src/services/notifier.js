@@ -67,17 +67,29 @@ class NotificationService {
     const emoji = { EXTREME: '🚨', HIGH: '⚠️', MEDIUM: '📊', LOW: 'ℹ️', CRITICAL: '🔥' };
     const riskLabel = { EXTREME: 'Sangat Tinggi', HIGH: 'Tinggi', MEDIUM: 'Sedang', LOW: 'Rendah', CRITICAL: 'Kritis' };
 
+    const txHashList = data.txHashes && data.txHashes.length > 0 
+      ? data.txHashes.map((h, i) => `${i + 1}. <code>${h.slice(0, 6)}...${h.slice(-4)}</code>`).join('\n')
+      : '<i>N/A</i>';
+
+    const dexList = data.dexes && data.dexes.length > 0
+      ? data.dexes.join(', ')
+      : 'Uniswap';
+
     return [
       `🐳 <b>ACCUMULATION ALERT</b>`,
       `━━━━━━━━━━━━━━━━━━━━`,
       `Wallet: <code>${wallet.slice(0, 6)}...${wallet.slice(-4)}</code>`,
       `Token: <b>$${tokenSymbol}</b>`,
       `Arah: <b>${direction}</b>`,
+      `Platform: <b>${dexList}</b>`,
       ``,
       `🔄 Transaksi: <b>${transactions}x</b>`,
       `💰 Total Volume: <b>${formatUSD(totalVolume)}</b>`,
       `🌊 Total Impact: <b>${(combinedImpactPct * 100).toFixed(2)}%</b>`,
       `⏳ Periode Waktu: <b>${timeWindow}</b>`,
+      ``,
+      `🔗 <b>Daftar Transaksi:</b>`,
+      txHashList,
       ``,
       `${emoji[riskLevel] || 'ℹ️'} Tingkat Risiko: <b>${riskLabel[riskLevel] || riskLevel}</b>`
     ].join('\n');

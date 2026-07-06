@@ -189,7 +189,15 @@ async function main() {
         researchStore.recordWhale(swapData, result);
         
         // --- 2. ACCUMULATION DETECTION ---
-        const accumulationEvent = accumulationTracker.processSwap(result);
+        const accumulationEvent = accumulationTracker.processSwap({
+          wallet: swapData.wallet,
+          tokenSymbol: tokenName,
+          direction: swapData.direction,
+          usdValue: result.usdValue,
+          lpImpactPct: result.lpImpactPct,
+          txHash: swapData.txHash,
+          pool: swapData.pool
+        });
         if (accumulationEvent) {
           console.log(`🐳 [ACCUMULATION DETECTED] ${accumulationEvent.wallet} accumulated ${accumulationEvent.tokenSymbol}`);
           if (bot.broadcastAccumulation) {
