@@ -37,8 +37,11 @@ class ResearchStore extends StoreBase {
     }
 
     // Averages Tracking
-    this.data.sum_whale_score = (this.data.sum_whale_score || 0) + (analysisResult.score || 0);
-    this.data.sum_liquidity_impact = (this.data.sum_liquidity_impact || 0) + (analysisResult.liquidityImpact || 0);
+    const score = analysisResult.whaleScore ? analysisResult.whaleScore.total : 0;
+    const impact = analysisResult.lpImpactPct || 0;
+    this.data.sum_whale_score = (this.data.sum_whale_score || 0) + score;
+    this.data.sum_liquidity_impact = (this.data.sum_liquidity_impact || 0) + impact;
+    this.data.scored_whale_alerts = (this.data.scored_whale_alerts || 0) + 1;
 
     // Highest Transaction
     if (!this.data.highest_transaction) {
@@ -80,8 +83,9 @@ class ResearchStore extends StoreBase {
 
   getStats() {
     const d = this.data;
-    const average_score = d.total_whale_alerts > 0 ? (d.sum_whale_score / d.total_whale_alerts) : 0;
-    const average_impact = d.total_whale_alerts > 0 ? (d.sum_liquidity_impact / d.total_whale_alerts) : 0;
+    const divisor = d.scored_whale_alerts || d.total_whale_alerts;
+    const average_score = divisor > 0 ? (d.sum_whale_score / divisor) : 0;
+    const average_impact = divisor > 0 ? (d.sum_liquidity_impact / divisor) : 0;
 
     return {
       ...d,
