@@ -4,30 +4,10 @@ const StorageManager = require('../storage/StorageManager');
 const path = require('path');
 
 class ExcelExporter {
-  static generateResearchReport(rawAlerts, stats) {
+  static generateDatasetExcel(rawAlerts) {
     const workbook = XLSX.utils.book_new();
+    const alerts = this.normalizeAlerts(rawAlerts);
 
-    // Normalize alerts to ensure compatibility between old and new JSON structures
-    const alerts = rawAlerts.map(alert => {
-      const dateTimeStr = alert.dateTime || (alert.timestamp ? new Date(alert.timestamp).toLocaleString('id-ID') : 'Unknown');
-      return {
-        ...alert,
-        dateTimeStr: dateTimeStr,
-        dateOnly: dateTimeStr.split(' ')[0] || '',
-        timeOnly: dateTimeStr.split(' ')[1] || '',
-        token: alert.token || alert.tokenSymbol || 'UNKNOWN',
-        transactionType: alert.transactionType || alert.direction || 'UNKNOWN',
-        valueUSD: alert.valueUSD || 0,
-        valueETH: alert.valueETH || alert.amountIn || alert.amountOut || 0,
-        whaleScore: alert.whaleScore?.total !== undefined ? alert.whaleScore.total : (alert.whaleScore || 0),
-        liquidityImpactPct: alert.liquidityImpactPct || alert.liquidityImpact || 0,
-        dex: alert.dex || alert.pool?.dex || 'UNKNOWN',
-        walletAddress: alert.walletAddress || alert.wallet || 'UNKNOWN',
-        txHash: alert.txHash || 'N/A'
-      };
-    });
-
-    // 1. Sheet: Dataset Penelitian
     const datasetData = alerts.map((alert, index) => ({
       'No': index + 1,
       'Tanggal': alert.dateOnly,
@@ -44,31 +24,29 @@ class ExcelExporter {
     }));
     const datasetSheet = XLSX.utils.json_to_sheet(datasetData);
     
-    // Set column widths for Dataset
     datasetSheet['!cols'] = [
-      { wch: 5 },  // No
-      { wch: 12 }, // Tanggal
-      { wch: 10 }, // Jam
-      { wch: 12 }, // Koin/Token
-      { wch: 20 }, // Aktivitas
-      { wch: 25 }, // Nilai Uang (USD)
-      { wch: 15 }, // Jumlah Token
-      { wch: 18 }, // Skor Whale
-      { wch: 20 }, // Efek ke Harga
-      { wch: 15 }, // Bursa (DEX)
-      { wch: 45 }, // Dompet
-      { wch: 68 }  // Kode Transaksi
+      { wch: 5 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 20 },
+      { wch: 25 }, { wch: 15 }, { wch: 18 }, { wch: 20 }, { wch: 15 },
+      { wch: 45 }, { wch: 68 }
     ];
     XLSX.utils.book_append_sheet(workbook, datasetSheet, "Data Lengkap");
 
-    // 2. Sheet: Ringkasan Penelitian
-    // Calculate monitoring duration
+    const today = new Date().toISOString().split('T')[0];
+    const filename = `dataset_penelitian_${today}.xlsx`;
+    const filePath = StorageManager.getResearchPath(filename);
+    XLSX.writeFile(workbook, filePath);
+    return filePath;
+  }
+
+  static generateSummaryExcel(rawAlerts, stats) {
+    const workbook = XLSX.utils.book_new();
+    const alerts = this.normalizeAlerts(rawAlerts);
+
     let monitoringHours = 0;
     if (stats.monitoring_start_date) {
       monitoringHours = (Date.now() - new Date(stats.monitoring_start_date).getTime()) / 3600000;
     }
 
-    // Calculate metrics based on ALERTS, not just stats
     const totalVolume = alerts.reduce((acc, val) => acc + (val.valueUSD || 0), 0);
     const avgScore = alerts.length > 0 ? alerts.reduce((acc, val) => acc + (val.whaleScore || 0), 0) / alerts.length : 0;
     const maxScore = alerts.length > 0 ? Math.max(...alerts.map(a => a.whaleScore || 0)) : 0;
@@ -102,7 +80,6 @@ class ExcelExporter {
     summarySheet['!cols'] = [{ wch: 30 }, { wch: 40 }];
     XLSX.utils.book_append_sheet(workbook, summarySheet, "Ringkasan Penelitian");
 
-    // 3. Sheet: Statistik Token
     const tokens = {};
     alerts.forEach(alert => {
       const t = alert.token || 'UNKNOWN';
@@ -121,7 +98,6 @@ class ExcelExporter {
     const tokenSheet = XLSX.utils.json_to_sheet(tokenData);
     XLSX.utils.book_append_sheet(workbook, tokenSheet, "Statistik Token");
 
-    // Top 10 Largest Transactions
     const top10 = [...alerts].sort((a, b) => (b.valueUSD || 0) - (a.valueUSD || 0)).slice(0, 10);
     const top10Data = top10.map((alert, index) => ({
       Rank: index + 1,
@@ -134,16 +110,36 @@ class ExcelExporter {
     
     XLSX.utils.sheet_add_aoa(summarySheet, [
       [""],
-      ["TOP 10 LARGEST WHALE TRANSACTIONS"]
+      ["10 TRANSAKSI PAUS TERBESAR"]
     ], { origin: -1 });
     XLSX.utils.sheet_add_json(summarySheet, top10Data, { origin: -1 });
 
     const today = new Date().toISOString().split('T')[0];
-    const filename = `whale_research_report_${today}.xlsx`;
+    const filename = `ringkasan_penelitian_${today}.xlsx`;
     const filePath = StorageManager.getResearchPath(filename);
-
     XLSX.writeFile(workbook, filePath);
     return filePath;
+  }
+
+  static normalizeAlerts(rawAlerts) {
+    return rawAlerts.map(alert => {
+      const dateTimeStr = alert.dateTime || (alert.timestamp ? new Date(alert.timestamp).toLocaleString('id-ID') : 'Unknown');
+      return {
+        ...alert,
+        dateTimeStr: dateTimeStr,
+        dateOnly: dateTimeStr.split(' ')[0] || '',
+        timeOnly: dateTimeStr.split(' ')[1] || '',
+        token: alert.token || alert.tokenSymbol || 'UNKNOWN',
+        transactionType: alert.transactionType || alert.direction || 'UNKNOWN',
+        valueUSD: alert.valueUSD || 0,
+        valueETH: alert.valueETH || alert.amountIn || alert.amountOut || 0,
+        whaleScore: alert.whaleScore?.total !== undefined ? alert.whaleScore.total : (alert.whaleScore || 0),
+        liquidityImpactPct: alert.liquidityImpactPct || alert.liquidityImpact || 0,
+        dex: alert.dex || alert.pool?.dex || 'UNKNOWN',
+        walletAddress: alert.walletAddress || alert.wallet || 'UNKNOWN',
+        txHash: alert.txHash || 'N/A'
+      };
+    });
   }
 }
 

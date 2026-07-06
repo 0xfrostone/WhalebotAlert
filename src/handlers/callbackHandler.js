@@ -156,13 +156,10 @@ class CallbackHandler {
         }
 
         const { ExcelExporter } = require('../utils/excelExporter');
-        const rs = this.appBot.researchStore.getStats();
-        // Adjust the stats to just represent the user's total alerts for the export header
-        rs.total_alerts_sent = alerts.length;
-        const filePath = ExcelExporter.generateResearchReport(alerts, rs);
+        const filePath = ExcelExporter.generateDatasetExcel(alerts);
 
         await this.bot.sendDocument(chatId, filePath, {
-          caption: '📊 <b>Dataset & Ringkasan Penelitian</b>\n\nSeluruh data transaksi whale mentah dan statistik analisis dalam format Excel (XLSX).',
+          caption: '📊 <b>Dataset Penelitian</b>\n\nSeluruh data transaksi whale mentah dalam format Excel (XLSX).',
           parse_mode: 'HTML'
         });
         
@@ -185,10 +182,10 @@ class CallbackHandler {
         const { ExcelExporter } = require('../utils/excelExporter');
         const rs = this.appBot.researchStore.getStats();
         rs.total_alerts_sent = alerts.length;
-        const filePath = ExcelExporter.generateResearchReport(alerts, rs);
+        const filePath = ExcelExporter.generateSummaryExcel(alerts, rs);
 
         await this.bot.sendDocument(chatId, filePath, {
-          caption: '📊 <b>Dataset & Ringkasan Penelitian</b>\n\nLaporan komprehensif berisi statistik, aktivitas token, dan dataset (XLSX).',
+          caption: '📊 <b>Ringkasan Penelitian</b>\n\nLaporan komprehensif berisi statistik, aktivitas token, dan ringkasan angka penelitian (XLSX).',
           parse_mode: 'HTML'
         });
         
