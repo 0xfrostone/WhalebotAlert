@@ -30,36 +30,36 @@ class ExcelExporter {
     // 1. Sheet: Dataset Penelitian
     const datasetData = alerts.map((alert, index) => ({
       'No': index + 1,
-      'Date': alert.dateOnly,
-      'Time': alert.timeOnly,
-      'Token': alert.token,
-      'Action': alert.transactionType,
-      'Transaction Value (USD)': alert.valueUSD,
-      'Token Amount': alert.valueETH,
-      'Whale Score': alert.whaleScore,
-      'Liquidity Impact (%)': alert.liquidityImpactPct,
-      'DEX': alert.dex,
-      'Wallet Address': alert.walletAddress,
-      'Transaction Hash': alert.txHash
+      'Tanggal': alert.dateOnly,
+      'Jam': alert.timeOnly,
+      'Koin/Token': alert.token,
+      'Aktivitas (Beli/Jual)': alert.transactionType === 'BUY' ? 'Beli' : 'Jual',
+      'Nilai Uang (USD)': alert.valueUSD,
+      'Jumlah Token': alert.valueETH,
+      'Skor Whale (0-100)': alert.whaleScore,
+      'Efek ke Harga (%)': alert.liquidityImpactPct,
+      'Bursa (DEX)': alert.dex,
+      'Dompet (Wallet)': alert.walletAddress,
+      'Kode Transaksi': alert.txHash
     }));
     const datasetSheet = XLSX.utils.json_to_sheet(datasetData);
     
     // Set column widths for Dataset
     datasetSheet['!cols'] = [
       { wch: 5 },  // No
-      { wch: 12 }, // Date
-      { wch: 10 }, // Time
-      { wch: 8 },  // Token
-      { wch: 8 },  // Action
-      { wch: 25 }, // USD
-      { wch: 15 }, // Token Amount
-      { wch: 12 }, // Whale Score
-      { wch: 20 }, // Liquidity Impact
-      { wch: 15 }, // DEX
-      { wch: 45 }, // Wallet
-      { wch: 68 }  // TX Hash
+      { wch: 12 }, // Tanggal
+      { wch: 10 }, // Jam
+      { wch: 12 }, // Koin/Token
+      { wch: 20 }, // Aktivitas
+      { wch: 25 }, // Nilai Uang (USD)
+      { wch: 15 }, // Jumlah Token
+      { wch: 18 }, // Skor Whale
+      { wch: 20 }, // Efek ke Harga
+      { wch: 15 }, // Bursa (DEX)
+      { wch: 45 }, // Dompet
+      { wch: 68 }  // Kode Transaksi
     ];
-    XLSX.utils.book_append_sheet(workbook, datasetSheet, "Dataset Penelitian");
+    XLSX.utils.book_append_sheet(workbook, datasetSheet, "Data Lengkap");
 
     // 2. Sheet: Ringkasan Penelitian
     // Calculate monitoring duration
@@ -78,25 +78,25 @@ class ExcelExporter {
     const avgTxValue = alerts.length > 0 ? totalVolume / alerts.length : 0;
 
     const summaryData = [
-      ["MONITORING PERIOD"],
-      ["Start Date", stats.monitoring_start_date ? new Date(stats.monitoring_start_date).toLocaleString('id-ID') : 'N/A'],
-      ["End Date", new Date().toLocaleString('id-ID')],
-      ["Duration", `${monitoringHours.toFixed(2)} Hours (${(monitoringHours / 24).toFixed(1)} Days)`],
+      ["PERIODE PEMANTAUAN"],
+      ["Waktu Mulai", stats.monitoring_start_date ? new Date(stats.monitoring_start_date).toLocaleString('id-ID') : 'Tidak Diketahui'],
+      ["Waktu Selesai", new Date().toLocaleString('id-ID')],
+      ["Lama Pemantauan", `${monitoringHours.toFixed(2)} Jam (${(monitoringHours / 24).toFixed(1)} Hari)`],
       [""],
-      ["WHALE DETECTION STATISTICS"],
-      ["Total Events Received", stats.total_events_received || 0],
-      ["Total Whale Detected", stats.total_whale_detected || 0],
-      ["Total Alerts Sent", stats.total_alerts_sent || 0],
-      ["BUY Count", alerts.filter(a => a.transactionType === 'BUY').length],
-      ["SELL Count", alerts.filter(a => a.transactionType === 'SELL').length],
+      ["STATISTIK DETEKSI WHALE (PAUS)"],
+      ["Total Transaksi Terpantau", stats.total_events || 0],
+      ["Total Paus Ditemukan", stats.total_whale_alerts || 0],
+      ["Total Notifikasi Dikirim", stats.total_alerts_sent || 0],
+      ["Total Aktivitas Pembelian", alerts.filter(a => a.transactionType === 'BUY').length],
+      ["Total Aktivitas Penjualan", alerts.filter(a => a.transactionType === 'SELL').length],
       [""],
-      ["RESEARCH METRICS"],
-      ["Average Whale Score", avgScore.toFixed(2)],
-      ["Highest Whale Score", maxScore],
-      ["Average Liquidity Impact (%)", avgImpact.toFixed(4)],
-      ["Highest Liquidity Impact (%)", maxImpact.toFixed(4)],
-      ["Average Transaction Value (USD)", avgTxValue.toFixed(2)],
-      ["Largest Transaction Value (USD)", maxTxValue.toFixed(2)]
+      ["RANGKUMAN ANGKA"],
+      ["Rata-Rata Skor Paus", avgScore.toFixed(2)],
+      ["Skor Paus Tertinggi", maxScore],
+      ["Rata-Rata Efek ke Harga Pasar (%)", avgImpact.toFixed(4)],
+      ["Efek Terbesar ke Harga Pasar (%)", maxImpact.toFixed(4)],
+      ["Rata-Rata Nilai Transaksi (USD)", avgTxValue.toFixed(2)],
+      ["Nilai Transaksi Terbesar (USD)", maxTxValue.toFixed(2)]
     ];
     const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
     summarySheet['!cols'] = [{ wch: 30 }, { wch: 40 }];

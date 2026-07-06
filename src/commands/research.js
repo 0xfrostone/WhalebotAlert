@@ -12,7 +12,7 @@ function setupResearchCommand(bot) {
           { text: '📊 Statistik', callback_data: 'research_statistics' }
         ],
         [
-          { text: '📥 Export CSV', callback_data: 'research_export_csv' }
+          { text: '📥 Export Excel (Awam)', callback_data: 'export_menu' }
         ],
         [
           { text: '← Menu Utama', callback_data: 'menu_back' }

@@ -2,8 +2,6 @@
 // Handler untuk research menu callbacks (Riwayat Alert & Statistik)
 
 const fs = require('fs');
-const { AlertLogger } = require('../services/alertLogger');
-const { CSVExporter } = require('../utils/csvExporter');
 const { formatUSD } = require('../utils/formatter');
 
 class ResearchHandler {
@@ -24,11 +22,6 @@ class ResearchHandler {
           await this.showAlertDetail(chatId, alertId, query.message.message_id);
         } else if (data === 'research_statistics') {
           await this.showStatistics(chatId, query.message.message_id);
-        } else if (data === 'research_export_csv') {
-          await this.exportDataCSV(chatId);
-        } else if (data.startsWith('research_token_filter_')) {
-          const token = data.replace('research_token_filter_', '');
-          await this.showTokenAnalysis(chatId, token, query.message.message_id);
         }
 
         await this.bot.answerCallbackQuery(query.id);
@@ -266,103 +259,6 @@ class ResearchHandler {
     }
   }
 
-  async exportDataCSV(chatId) {
-    try {
-      const recentAlerts = this.alertLogger.getRecentAlerts(500);
-
-      if (recentAlerts.length === 0) {
-        await this.bot.sendMessage(chatId, '❌ Tidak ada data untuk diexport');
-        return;
-      }
-
-      // Generate XLSX content
-      const { ExcelExporter } = require('../utils/excelExporter');
-      const StorageManager = require('../storage/StorageManager');
-      const rs = StorageManager.readJSON('research_stats.json', {});
-      const filePath = ExcelExporter.generateResearchReport(recentAlerts, rs);
-
-      // Send file to user
-      await this.bot.sendDocument(chatId, filePath, {
-        caption: `📊 <b>Export Data Penelitian (XLSX)</b>\n\n` +
-                `Total Records: ${recentAlerts.length}\n` +
-                `Format: XLSX\n` +
-                `Tanggal: ${new Date().toLocaleString('id-ID')}\n\n` +
-                `Laporan siap digunakan untuk analisis BAB 4 skripsi.`,
-        parse_mode: 'HTML'
-      });
-
-      // Clean up
-      setTimeout(() => {
-        try {
-          fs.unlinkSync(filePath);
-        } catch (e) {}
-      }, 5000);
-    } catch (err) {
-      console.error('Error exporting CSV:', err.message);
-      await this.bot.sendMessage(chatId, '❌ Error during export: ' + err.message);
-    }
-  }
-
-  async showTokenAnalysis(chatId, token, messageId) {
-    try {
-      const recentAlerts = this.alertLogger.getRecentAlerts(500);
-      const tokenAlerts = recentAlerts.filter(a => a.token === token);
-
-      if (tokenAlerts.length === 0) {
-        await this.bot.editMessageText(`❌ Tidak ada data untuk $${token}`, {
-          chat_id: chatId,
-          message_id: messageId,
-        });
-        return;
-      }
-
-      const buyCount = tokenAlerts.filter(a => a.transactionType === 'BUY').length;
-      const sellCount = tokenAlerts.filter(a => a.transactionType === 'SELL').length;
-      const avgScore = Math.round((tokenAlerts.reduce((sum, a) => sum + a.whaleScore, 0) / tokenAlerts.length) * 100) / 100;
-      const totalVolume = tokenAlerts.reduce((sum, a) => sum + a.valueUSD, 0);
-
-      const riskCounts = {
-        EXTREME: tokenAlerts.filter(a => a.riskCategory === 'EXTREME').length,
-        HIGH: tokenAlerts.filter(a => a.riskCategory === 'HIGH').length,
-        MEDIUM: tokenAlerts.filter(a => a.riskCategory === 'MEDIUM').length,
-        LOW: tokenAlerts.filter(a => a.riskCategory === 'LOW').length,
-      };
-
-      const text = [
-        `📊 <b>ANALISIS TOKEN: $${token}</b>`,
-        `━━━━━━━━━━━━━━━━━━━━`,
-        ``,
-        `📈 Total Alert: <b>${tokenAlerts.length}</b>`,
-        `💰 Total Volume: <b>${formatUSD(totalVolume)}</b>`,
-        `⭐ Avg Score: <b>${avgScore}/100</b>`,
-        ``,
-        `<b>🎯 TRANSAKSI</b>`,
-        `🟢 BUY: ${buyCount}`,
-        `🔴 SELL: ${sellCount}`,
-        ``,
-        `<b>⚠️ DISTRIBUSI RISK</b>`,
-        `🚨 EXTREME: ${riskCounts.EXTREME}`,
-        `⚠️ HIGH: ${riskCounts.HIGH}`,
-        `📊 MEDIUM: ${riskCounts.MEDIUM}`,
-        `ℹ️ LOW: ${riskCounts.LOW}`,
-      ].join('\n');
-
-      const buttons = [
-        [
-          { text: '← Back', callback_data: 'research_statistics' }
-        ]
-      ];
-
-      await this.bot.editMessageText(text, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: 'HTML',
-        reply_markup: { inline_keyboard: buttons }
-      });
-    } catch (err) {
-      console.error('Error showing token analysis:', err.message);
-    }
-  }
 }
 
 module.exports = { ResearchHandler };
