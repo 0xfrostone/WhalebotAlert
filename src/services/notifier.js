@@ -47,10 +47,10 @@ class NotificationService {
       `━━━━━━━━━━━━━━━━━━━━`,
       ``,
       `Wallet`,
-      `<code>${wallet.slice(0, 6)}...${wallet.slice(-4)}</code>`,
+      `<a href="https://etherscan.io/address/${wallet}">${wallet}</a>`,
       ``,
       `Transaction`,
-      `<code>${txHash.slice(0, 6)}...${txHash.slice(-4)}</code>`,
+      `<a href="https://etherscan.io/tx/${txHash}">${txHash}</a>`,
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
       ``,
@@ -67,8 +67,8 @@ class NotificationService {
     const emoji = { EXTREME: '🚨', HIGH: '⚠️', MEDIUM: '📊', LOW: 'ℹ️', CRITICAL: '🔥' };
     const riskLabel = { EXTREME: 'Sangat Tinggi', HIGH: 'Tinggi', MEDIUM: 'Sedang', LOW: 'Rendah', CRITICAL: 'Kritis' };
 
-    const txHashList = data.txHashes && data.txHashes.length > 0 
-      ? data.txHashes.map((h, i) => `${i + 1}. <code>${h.slice(0, 6)}...${h.slice(-4)}</code>`).join('\n')
+    const txHashLinks = data.txHashes && data.txHashes.length > 0 
+      ? data.txHashes.map((h, i) => `<a href="https://etherscan.io/tx/${h}">[${i + 1}]</a>`).join(' ')
       : '<i>N/A</i>';
 
     const dexList = data.dexes && data.dexes.length > 0
@@ -78,7 +78,7 @@ class NotificationService {
     return [
       `🐳 <b>ACCUMULATION ALERT</b>`,
       `━━━━━━━━━━━━━━━━━━━━`,
-      `Wallet: <code>${wallet.slice(0, 6)}...${wallet.slice(-4)}</code>`,
+      `Wallet: <a href="https://etherscan.io/address/${wallet}">${wallet}</a>`,
       `Token: <b>$${tokenSymbol}</b>`,
       `Arah: <b>${direction}</b>`,
       `Platform: <b>${dexList}</b>`,
@@ -88,8 +88,8 @@ class NotificationService {
       `🌊 Total Impact: <b>${(combinedImpactPct * 100).toFixed(2)}%</b>`,
       `⏳ Periode Waktu: <b>${timeWindow}</b>`,
       ``,
-      `🔗 <b>Daftar Transaksi:</b>`,
-      txHashList,
+      `🔗 <b>Bukti Transaksi (Etherscan):</b>`,
+      txHashLinks,
       ``,
       `${emoji[riskLevel] || 'ℹ️'} Tingkat Risiko: <b>${riskLabel[riskLevel] || riskLevel}</b>`
     ].join('\n');

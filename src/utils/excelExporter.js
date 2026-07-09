@@ -134,7 +134,7 @@ class ExcelExporter {
         valueUSD: alert.valueUSD || 0,
         valueETH: alert.valueETH || alert.amountIn || alert.amountOut || 0,
         whaleScore: alert.whaleScore?.total !== undefined ? alert.whaleScore.total : (alert.whaleScore || 0),
-        liquidityImpactPct: alert.liquidityImpactPct || alert.liquidityImpact || 0,
+        liquidityImpactPct: (alert.lpImpactPct || alert.liquidityImpactPct || alert.liquidityImpact || 0) * 100,
         dex: alert.dex || alert.pool?.dex || 'UNKNOWN',
         walletAddress: alert.walletAddress || alert.wallet || 'UNKNOWN',
         txHash: alert.txHash || 'N/A'
