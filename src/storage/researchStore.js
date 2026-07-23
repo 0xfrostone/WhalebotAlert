@@ -87,10 +87,24 @@ class ResearchStore extends StoreBase {
     const average_score = divisor > 0 ? (d.sum_whale_score / divisor) : 0;
     const average_impact = divisor > 0 ? (d.sum_liquidity_impact / divisor) : 0;
 
+    const totalBuySell = (d.buy_count || 0) + (d.sell_count || 0);
+    const buyPct = totalBuySell > 0 ? ((d.buy_count || 0) / totalBuySell * 100).toFixed(1) : '0.0';
+    const sellPct = totalBuySell > 0 ? ((d.sell_count || 0) / totalBuySell * 100).toFixed(1) : '0.0';
+    
+    let sentiment = '⚪ NETRAL';
+    if ((d.buy_count || 0) > (d.sell_count || 0)) {
+      sentiment = '🟢 BULLISH (Dominasi Akumulasi)';
+    } else if ((d.sell_count || 0) > (d.buy_count || 0)) {
+      sentiment = '🔴 BEARISH (Dominasi Distribusi)';
+    }
+
     return {
       ...d,
       average_score,
-      average_impact
+      average_impact,
+      buyPct,
+      sellPct,
+      sentiment
     };
   }
 }

@@ -104,14 +104,13 @@ class CallbackHandler {
       const startDate = new Date(rs.monitoring_start_date).toLocaleString('id-ID');
       const lastDate = new Date().toLocaleString('id-ID');
 
-      // Token string builder
       let tokensStr = '';
       if (rs.token_stats && Object.keys(rs.token_stats).length > 0) {
         for (const [sym, stats] of Object.entries(rs.token_stats)) {
-          tokensStr += `\n${sym}:\nBUY ${stats.BUY}\nSELL ${stats.SELL}\n`;
+          tokensStr += `\n${sym}: BUY ${stats.BUY} | SELL ${stats.SELL}`;
         }
       } else {
-        tokensStr = '\nBelum ada data token.\n';
+        tokensStr = '\nBelum ada data token.';
       }
 
       const h_token = rs.highest_transaction.token || '-';
@@ -120,16 +119,182 @@ class CallbackHandler {
 
       const avg_score = rs.average_score.toFixed(1);
       const avg_impact = (rs.average_impact * 100).toFixed(5);
-      
       const uptimeH = ((Date.now() - new Date(rs.monitoring_start_date).getTime()) / 3_600_000).toFixed(1);
 
-      const msgText = `📈 <b>Statistik Penelitian</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n<b>Periode Monitoring</b>\nMulai:\n${startDate}\n\nTerakhir:\n${lastDate}\n\n━━━━━━━━━━━━━━━━━━━━\n\n<b>Aktivitas Whale</b>\n\nTotal Event Masuk:\n<b>${rs.total_events}</b>\n\nTotal Whale Terdeteksi:\n<b>${rs.total_whale_alerts}</b>\n\nTotal Alert Dikirim:\n<b>${rs.total_alerts_sent}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n<b>Aktivitas BUY / SELL</b>\n\nBUY:\n<b>${rs.buy_count}</b>\n\nSELL:\n<b>${rs.sell_count}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n<b>Per Token</b>\n${tokensStr}\n━━━━━━━━━━━━━━━━━━━━\n\n<b>Transaksi Terbesar</b>\n\nToken:\n<b>${h_token}</b>\n\nNilai:\n<b>${h_amount}</b>\n\nWaktu:\n<b>${h_time}</b>\n\n━━━━━━━━━━━━━━━━━━━━\n\n<b>Metrik Sistem</b>\n\nRata-rata Whale Score:\n<b>${avg_score}</b>\n\nRata-rata Liquidity Impact:\n<b>${avg_impact}%</b>\n\nMonitoring Uptime:\n<b>${uptimeH} jam</b>\n\n━━━━━━━━━━━━━━━━━━━━`;
+      const msgText = [
+        `📈 <b>Statistik Penelitian Skripsi</b>`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        ``,
+        `🎯 <b>Sentimen Pasar Whale:</b>`,
+        `<b>${rs.sentiment || '⚪ NETRAL'}</b>`,
+        ``,
+        `<b>Periode Monitoring</b>`,
+        `Mulai: ${startDate}`,
+        `Terakhir: ${lastDate}`,
+        ``,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        ``,
+        `<b>Aktivitas Whale</b>`,
+        `Total Event: <b>${rs.total_events}</b>`,
+        `Whale Terdeteksi: <b>${rs.total_whale_alerts}</b>`,
+        `Alert Dikirim: <b>${rs.total_alerts_sent}</b>`,
+        ``,
+        `<b>Aktivitas BUY vs SELL</b>`,
+        `🟢 BUY : <b>${rs.buy_count} (${rs.buyPct || 0}%)</b>`,
+        `🔴 SELL: <b>${rs.sell_count} (${rs.sellPct || 0}%)</b>`,
+        ``,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        ``,
+        `<b>Per Token Watchlist</b>${tokensStr}`,
+        ``,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        ``,
+        `<b>Transaksi Terbesar</b>`,
+        `Token: <b>${h_token}</b>`,
+        `Nilai: <b>${h_amount}</b>`,
+        `Waktu: <b>${h_time}</b>`,
+        ``,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        ``,
+        `<b>Metrik Riset</b>`,
+        `Avg Whale Score: <b>${avg_score}/100</b>`,
+        `Avg Impact Harga: <b>${avg_impact}%</b>`,
+        `Uptime System: <b>${uptimeH} Jam</b>`,
+        ``,
+        `━━━━━━━━━━━━━━━━━━━━`
+      ].join('\n');
 
       return this.editMsg(chatId, msgId, msgText, {
         inline_keyboard: [
-          [{ text: '🔄 Refresh', callback_data: 'refresh_research_stats' }],
-          [{ text: '📤 Export Data', callback_data: 'export_menu' }],
+          [
+            { text: '🖼️ Grafik Statistik', callback_data: 'research_chart' },
+            { text: '📄 Laporan PDF/Teks', callback_data: 'export_pdf' }
+          ],
+          [
+            { text: '🔄 Refresh', callback_data: 'refresh_research_stats' },
+            { text: '📤 Export Excel', callback_data: 'export_menu' }
+          ],
           [{ text: '⬅️ Kembali', callback_data: 'nav_main' }]
+        ]
+      });
+    }
+
+    if (data === 'research_chart') {
+      try {
+        const rs = this.appBot.researchStore.getStats();
+        const buyCount = rs.buy_count || 0;
+        const sellCount = rs.sell_count || 0;
+
+        const chartConfig = {
+          type: 'doughnut',
+          data: {
+            labels: [`BUY (${rs.buyPct || 0}%)`, `SELL (${rs.sellPct || 0}%)`],
+            datasets: [{
+              data: [buyCount || 1, sellCount || 0],
+              backgroundColor: ['#22c55e', '#ef4444']
+            }]
+          },
+          options: {
+            plugins: {
+              title: { display: true, text: 'Rasio Aktivitas Whale (BUY vs SELL)', fontSize: 18 }
+            }
+          }
+        };
+
+        const chartUrl = `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}&w=500&h=300&bkg=white`;
+
+        await this.bot.sendPhoto(chatId, chartUrl, {
+          caption: `🖼️ <b>Grafik Aktivitas Whale (BUY vs SELL)</b>\n\nSentimen: <b>${rs.sentiment || 'NETRAL'}</b>\nTotal BUY: ${buyCount} | Total SELL: ${sellCount}\n\n<i>Bisa langsung di-copy & paste ke slide presentasi sidang skripsi!</i>`,
+          parse_mode: 'HTML'
+        });
+
+        return this.bot.answerCallbackQuery(query.id, { text: 'Grafik berhasil dikirim!', show_alert: false });
+      } catch (err) {
+        console.error('Error generating chart:', err);
+        return this.bot.sendMessage(chatId, `❌ Gagal memuat grafik: ${err.message}`);
+      }
+    }
+
+    if (data === 'export_pdf') {
+      try {
+        const StorageManager = require('../storage/StorageManager');
+        const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
+        const rs = this.appBot.researchStore.getStats();
+
+        const fs = require('fs');
+        const today = new Date().toISOString().split('T')[0];
+        const filename = `lampiran_laporan_skripsi_${today}.txt`;
+        const filePath = StorageManager.getResearchPath(filename);
+
+        const reportText = [
+          `====================================================================`,
+          `         LAMPIRAN LAPORAN HASIL PENELITIAN SKRIPSI`,
+          `   SISTEM INTELLIGENCE WHALE MONITORING & IMPACT ANALYSIS`,
+          `====================================================================`,
+          `Tanggal Cetak : ${new Date().toLocaleString('id-ID')}`,
+          `Status Sistem : ONLINE / AKTIF`,
+          ``,
+          `1. METRIK MONITORING`,
+          `--------------------------------------------------------------------`,
+          `Waktu Mulai Monitoring : ${new Date(rs.monitoring_start_date).toLocaleString('id-ID')}`,
+          `Total Event Terpantau  : ${rs.total_events}`,
+          `Total Transaksi Whale  : ${rs.total_whale_alerts}`,
+          `Total Alert Terkirim   : ${alerts.length}`,
+          `Sentimen Pasar Whale   : ${rs.sentiment || 'NETRAL'}`,
+          ``,
+          `2. ANALISIS AKTIVITAS BUY VS SELL`,
+          `--------------------------------------------------------------------`,
+          `Total Transaksi BUY    : ${rs.buy_count} (${rs.buyPct}%)`,
+          `Total Transaksi SELL   : ${rs.sell_count} (${rs.sellPct}%)`,
+          `Rata-Rata Whale Score  : ${rs.average_score.toFixed(1)} / 100`,
+          `Rata-Rata Dampak Harga : ${(rs.average_impact * 100).toFixed(4)}%`,
+          ``,
+          `3. TRANSAKSI TERBESAR TERDETEKSI`,
+          `--------------------------------------------------------------------`,
+          `Token                  : ${rs.highest_transaction.token || '-'}`,
+          `Nilai Uang (USD)       : $${(rs.highest_transaction.amount || 0).toLocaleString('id-ID')}`,
+          `Waktu Transaksi        : ${rs.highest_transaction.timestamp ? new Date(rs.highest_transaction.timestamp).toLocaleString('id-ID') : '-'}`,
+          ``,
+          `4. DAFTAR RIWAYAT ALERT (SAMPEL DATASET PENELITIAN)`,
+          `--------------------------------------------------------------------`,
+          alerts.slice(0, 50).map((a, i) => 
+            `[${i + 1}] ${a.dateTime} | Token: $${a.tokenSymbol || a.token} | Arah: ${a.direction || a.transactionType} | USD: $${a.valueUSD} | Score: ${a.whaleScore}`
+          ).join('\n'),
+          ``,
+          `====================================================================`,
+          `           DOKUMEN INI DICETAK SECARA OTOMATIS OLEH BOT`,
+          `               SIAP DIGUNAKAN SEBAGAI LAMPIRAN BAB 4`,
+          `====================================================================`
+        ].join('\n');
+
+        fs.writeFileSync(filePath, reportText, 'utf8');
+
+        await this.bot.sendDocument(chatId, filePath, {
+          caption: `📄 <b>Laporan Ringkasan Penelitian (Lampiran Skripsi)</b>\n\nFormat laporan bersih terstruktur siap cetak untuk lampiran dokumen skripsi Bab 4.`,
+          parse_mode: 'HTML'
+        });
+
+        return this.bot.answerCallbackQuery(query.id, { text: 'Laporan berhasil dikirim!', show_alert: false });
+      } catch (err) {
+        console.error('Error exporting PDF/text report:', err);
+        return this.bot.sendMessage(chatId, `❌ Gagal export laporan: ${err.message}`);
+      }
+    }
+
+    if (data === 'menu_preset_popular') {
+      const presets = ['LINK', 'UNI', 'PEPE'];
+      for (const token of presets) {
+        if (!this.appBot.watchlistStore.hasToken(chatId, token)) {
+          this.appBot.watchlistStore.addToken(chatId, token);
+        }
+      }
+      const currentTokens = this.appBot.watchlistStore.getTokens(chatId);
+      const text = `⚡ <b>Preset Token Berhasil Ditambahkan!</b>\n\nToken populer ditambahkan: <b>LINK, UNI, PEPE</b>\nWatchlist kamu saat ini (${currentTokens.length} token):\n<b>${currentTokens.join(', ')}</b>`;
+
+      return this.editMsg(chatId, msgId, text, {
+        inline_keyboard: [
+          [{ text: '📋 Lihat Watchlist', callback_data: 'menu_my_watchlist' }],
+          [{ text: '⬅️ Kembali', callback_data: 'nav_watchlist' }]
         ]
       });
     }

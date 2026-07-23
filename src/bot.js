@@ -226,6 +226,7 @@ class InteractiveWhaleBot {
           { text: '➕ Tambah Token', callback_data: 'menu_add_token' },
           { text: '➖ Hapus Token', callback_data: 'menu_remove_token' }
         ],
+        [ { text: '⚡ Preset Token (LINK, UNI, PEPE)', callback_data: 'menu_preset_popular' } ],
         [ { text: '📋 Lihat Watchlist', callback_data: 'menu_my_watchlist' } ],
         [ { text: '⬅️ Kembali', callback_data: 'nav_settings' } ]
       ]
