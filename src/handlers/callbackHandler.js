@@ -99,84 +99,13 @@ class CallbackHandler {
 
     if (data === 'nav_research_stats' || data === 'refresh_research_stats') {
       if (!isAdmin) return this.bot.answerCallbackQuery(query.id, { text: 'Akses ditolak', show_alert: true });
-      
-      const rs = this.appBot.researchStore.getStats();
-      const startDate = new Date(rs.monitoring_start_date).toLocaleString('id-ID');
-      const lastDate = new Date().toLocaleString('id-ID');
+      return this.renderResearchStats(chatId, msgId, 'all', query);
+    }
 
-      let tokensStr = '';
-      if (rs.token_stats && Object.keys(rs.token_stats).length > 0) {
-        for (const [sym, stats] of Object.entries(rs.token_stats)) {
-          tokensStr += `\n${sym}: BUY ${stats.BUY} | SELL ${stats.SELL}`;
-        }
-      } else {
-        tokensStr = '\nBelum ada data token.';
-      }
-
-      const h_token = rs.highest_transaction.token || '-';
-      const h_amount = formatUSD(rs.highest_transaction.amount || 0);
-      const h_time = rs.highest_transaction.timestamp ? new Date(rs.highest_transaction.timestamp).toLocaleString('id-ID') : '-';
-
-      const avg_score = rs.average_score.toFixed(1);
-      const avg_impact = (rs.average_impact * 100).toFixed(5);
-      const uptimeH = ((Date.now() - new Date(rs.monitoring_start_date).getTime()) / 3_600_000).toFixed(1);
-
-      const msgText = [
-        `📈 <b>Statistik Penelitian Skripsi</b>`,
-        `━━━━━━━━━━━━━━━━━━━━`,
-        ``,
-        `🎯 <b>Sentimen Pasar Whale:</b>`,
-        `<b>${rs.sentiment || '⚪ NETRAL'}</b>`,
-        ``,
-        `<b>Periode Monitoring</b>`,
-        `Mulai: ${startDate}`,
-        `Terakhir: ${lastDate}`,
-        ``,
-        `━━━━━━━━━━━━━━━━━━━━`,
-        ``,
-        `<b>Aktivitas Whale</b>`,
-        `Total Event: <b>${rs.total_events}</b>`,
-        `Whale Terdeteksi: <b>${rs.total_whale_alerts}</b>`,
-        `Alert Dikirim: <b>${rs.total_alerts_sent}</b>`,
-        ``,
-        `<b>Aktivitas BUY vs SELL</b>`,
-        `🟢 BUY : <b>${rs.buy_count} (${rs.buyPct || 0}%)</b>`,
-        `🔴 SELL: <b>${rs.sell_count} (${rs.sellPct || 0}%)</b>`,
-        ``,
-        `━━━━━━━━━━━━━━━━━━━━`,
-        ``,
-        `<b>Per Token Watchlist</b>${tokensStr}`,
-        ``,
-        `━━━━━━━━━━━━━━━━━━━━`,
-        ``,
-        `<b>Transaksi Terbesar</b>`,
-        `Token: <b>${h_token}</b>`,
-        `Nilai: <b>${h_amount}</b>`,
-        `Waktu: <b>${h_time}</b>`,
-        ``,
-        `━━━━━━━━━━━━━━━━━━━━`,
-        ``,
-        `<b>Metrik Riset</b>`,
-        `Avg Whale Score: <b>${avg_score}/100</b>`,
-        `Avg Impact Harga: <b>${avg_impact}%</b>`,
-        `Uptime System: <b>${uptimeH} Jam</b>`,
-        ``,
-        `━━━━━━━━━━━━━━━━━━━━`
-      ].join('\n');
-
-      return this.editMsg(chatId, msgId, msgText, {
-        inline_keyboard: [
-          [
-            { text: '🖼️ Grafik Statistik', callback_data: 'research_chart' },
-            { text: '📄 Laporan PDF/Teks', callback_data: 'export_pdf' }
-          ],
-          [
-            { text: '🔄 Refresh', callback_data: 'refresh_research_stats' },
-            { text: '📤 Export Excel', callback_data: 'export_menu' }
-          ],
-          [{ text: '⬅️ Kembali', callback_data: 'nav_main' }]
-        ]
-      });
+    if (data.startsWith('stats_filter_')) {
+      if (!isAdmin) return this.bot.answerCallbackQuery(query.id, { text: 'Akses ditolak', show_alert: true });
+      const period = data.replace('stats_filter_', '');
+      return this.renderResearchStats(chatId, msgId, period, query);
     }
 
     if (data === 'research_chart') {
@@ -729,6 +658,187 @@ class CallbackHandler {
     } catch (err) {
       console.error('Export Summary error:', err);
       return this.bot.sendMessage(chatId, `❌ Gagal export summary: ${err.message}`);
+    }
+  }
+
+  async renderResearchStats(chatId, msgId, period = 'all', query = null) {
+    const StorageManager = require('../storage/StorageManager');
+    const userAlerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
+    const rsGlobal = this.appBot.researchStore.getStats();
+
+    let alertsToUse = userAlerts;
+    let label = 'Semua Waktu';
+    const now = Date.now();
+
+    if (period === '24h') {
+      label = '24 Jam Terakhir';
+      alertsToUse = userAlerts.filter(a => {
+        const ts = a.timestamp || (a.savedAt ? new Date(a.savedAt).getTime() : 0);
+        return ts && (now - ts <= 24 * 3600 * 1000);
+      });
+    } else if (period === '7d') {
+      label = '7 Hari Terakhir';
+      alertsToUse = userAlerts.filter(a => {
+        const ts = a.timestamp || (a.savedAt ? new Date(a.savedAt).getTime() : 0);
+        return ts && (now - ts <= 7 * 24 * 3600 * 1000);
+      });
+    } else if (period === '30d') {
+      label = '30 Hari Terakhir';
+      alertsToUse = userAlerts.filter(a => {
+        const ts = a.timestamp || (a.savedAt ? new Date(a.savedAt).getTime() : 0);
+        return ts && (now - ts <= 30 * 24 * 3600 * 1000);
+      });
+    }
+
+    let buyCount = 0;
+    let sellCount = 0;
+    let tokenStats = {};
+    let highestTx = { amount: 0, token: '-', timestamp: '-' };
+    let sumScore = 0;
+    let sumImpact = 0;
+    let totalWhales = 0;
+
+    if (period !== 'all' && alertsToUse.length > 0) {
+      totalWhales = alertsToUse.length;
+      for (const a of alertsToUse) {
+        const dir = a.direction || a.transactionType || 'BUY';
+        if (dir === 'BUY') buyCount++;
+        else sellCount++;
+
+        const sym = a.tokenSymbol || a.token || 'UNKNOWN';
+        if (!tokenStats[sym]) tokenStats[sym] = { BUY: 0, SELL: 0 };
+        if (dir === 'BUY') tokenStats[sym].BUY++;
+        else tokenStats[sym].SELL++;
+
+        const usd = a.valueUSD || a.usdValue || 0;
+        if (usd > highestTx.amount) {
+          highestTx = {
+            amount: usd,
+            token: sym,
+            timestamp: a.dateTime || (a.timestamp ? new Date(a.timestamp).toLocaleString('id-ID') : '-')
+          };
+        }
+
+        const score = typeof a.whaleScore === 'number' ? a.whaleScore : (a.whaleScore?.total || 0);
+        sumScore += score;
+
+        const impact = a.lpImpactPct || a.liquidityImpactPct || 0;
+        sumImpact += impact;
+      }
+    } else {
+      buyCount = rsGlobal.buy_count || 0;
+      sellCount = rsGlobal.sell_count || 0;
+      tokenStats = rsGlobal.token_stats || {};
+      highestTx = {
+        amount: rsGlobal.highest_transaction ? rsGlobal.highest_transaction.amount || 0 : 0,
+        token: rsGlobal.highest_transaction ? rsGlobal.highest_transaction.token || '-' : '-',
+        timestamp: rsGlobal.highest_transaction && rsGlobal.highest_transaction.timestamp ? new Date(rsGlobal.highest_transaction.timestamp).toLocaleString('id-ID') : '-'
+      };
+      totalWhales = rsGlobal.total_whale_alerts || userAlerts.length;
+      sumScore = rsGlobal.sum_whale_score || 0;
+      sumImpact = rsGlobal.sum_liquidity_impact || 0;
+    }
+
+    const totalBuySell = buyCount + sellCount;
+    const buyPct = totalBuySell > 0 ? ((buyCount / totalBuySell) * 100).toFixed(1) : '0.0';
+    const sellPct = totalBuySell > 0 ? ((sellCount / totalBuySell) * 100).toFixed(1) : '0.0';
+
+    let sentiment = '⚪ NETRAL';
+    if (buyCount > sellCount) sentiment = '🟢 BULLISH (Dominasi Akumulasi)';
+    else if (sellCount > buyCount) sentiment = '🔴 BEARISH (Dominasi Distribusi)';
+
+    const divisor = totalWhales || 1;
+    const avgScore = (period === 'all' ? rsGlobal.average_score : (sumScore / divisor)).toFixed(1);
+    const avgImpact = ((period === 'all' ? rsGlobal.average_impact : (sumImpact / divisor)) * 100).toFixed(5);
+
+    const startDate = new Date(rsGlobal.monitoring_start_date).toLocaleString('id-ID');
+    const lastDate = new Date().toLocaleString('id-ID');
+
+    let tokensStr = '';
+    if (Object.keys(tokenStats).length > 0) {
+      for (const [sym, stats] of Object.entries(tokenStats)) {
+        tokensStr += `\n${sym}: BUY ${stats.BUY} | SELL ${stats.SELL}`;
+      }
+    } else {
+      tokensStr = '\nBelum ada data token.';
+    }
+
+    const { formatUSD } = require('../utils/formatter');
+    const h_amount = formatUSD(highestTx.amount);
+    const uptimeH = ((Date.now() - new Date(rsGlobal.monitoring_start_date).getTime()) / 3_600_000).toFixed(1);
+
+    const msgText = [
+      `📈 <b>Statistik Penelitian Skripsi</b>`,
+      `⏳ Filter Rentang Waktu: <b>${label}</b>`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `🎯 <b>Sentimen Pasar Whale:</b>`,
+      `<b>${sentiment}</b>`,
+      ``,
+      `<b>Periode Monitoring System</b>`,
+      `Mulai: ${startDate}`,
+      `Terakhir: ${lastDate}`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `<b>Aktivitas Whale (${label})</b>`,
+      `Total Event System: <b>${rsGlobal.total_events}</b>`,
+      `Whale Terdeteksi: <b>${totalWhales}</b>`,
+      `Alert Dikirim: <b>${period === 'all' ? rsGlobal.total_alerts_sent : alertsToUse.length}</b>`,
+      ``,
+      `<b>Aktivitas BUY vs SELL</b>`,
+      `🟢 BUY : <b>${buyCount} (${buyPct}%)</b>`,
+      `🔴 SELL: <b>${sellCount} (${sellPct}%)</b>`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `<b>Per Token Watchlist</b>${tokensStr}`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `<b>Transaksi Terbesar (${label})</b>`,
+      `Token: <b>${highestTx.token}</b>`,
+      `Nilai: <b>${h_amount}</b>`,
+      `Waktu: <b>${highestTx.timestamp}</b>`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `<b>Metrik Riset (${label})</b>`,
+      `Avg Whale Score: <b>${avgScore}/100</b>`,
+      `Avg Impact Harga: <b>${avgImpact}%</b>`,
+      `Uptime System: <b>${uptimeH} Jam</b>`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`
+    ].join('\n');
+
+    const b24h = period === '24h' ? '⚡ 24 Jam •' : '⚡ 24 Jam';
+    const b7d  = period === '7d'  ? '📅 7 Hari •' : '📅 7 Hari';
+    const b30d = period === '30d' ? '🗓️ 30 Hari •' : '🗓️ 30 Hari';
+    const ball = period === 'all' ? '🌐 Semua •' : '🌐 Semua';
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: b24h, callback_data: 'stats_filter_24h' },
+          { text: b7d,  callback_data: 'stats_filter_7d' },
+          { text: b30d, callback_data: 'stats_filter_30d' },
+          { text: ball, callback_data: 'stats_filter_all' }
+        ],
+        [
+          { text: '🖼️ Grafik Statistik', callback_data: 'research_chart' },
+          { text: '📄 Laporan PDF/Teks', callback_data: 'export_pdf' }
+        ],
+        [
+          { text: '🔄 Refresh', callback_data: `stats_filter_${period}` },
+          { text: '📤 Export Excel', callback_data: 'export_menu' }
+        ],
+        [{ text: '⬅️ Kembali', callback_data: 'nav_main' }]
+      ]
+    };
+
+    await this.editMsg(chatId, msgId, msgText, keyboard);
+    if (query) {
+      this.bot.answerCallbackQuery(query.id, { text: `Filter statistik: ${label}`, show_alert: false }).catch(() => {});
     }
   }
 
