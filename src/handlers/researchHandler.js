@@ -46,6 +46,11 @@ class ResearchHandler {
           chat_id: chatId,
           message_id: messageId,
           parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '⬅️ Kembali', callback_data: 'menu_back' }]
+            ]
+          }
         });
         return;
       }
@@ -65,12 +70,11 @@ class ResearchHandler {
       ]);
 
       buttons.push([
-        { text: '📊 Export CSV', callback_data: 'research_export_csv' },
-        { text: '📈 Statistik', callback_data: 'research_statistics' }
+        { text: '📈 Statistik', callback_data: 'nav_research_stats' }
       ]);
 
       buttons.push([
-        { text: '⬅️ Kembali ke Menu', callback_data: 'menu_back' }
+        { text: '⬅️ Kembali', callback_data: 'menu_back' }
       ]);
 
       await this.bot.editMessageText(text, {

@@ -137,46 +137,31 @@ class CallbackHandler {
     if (data === 'export_menu') {
       if (!isAdmin) return this.bot.answerCallbackQuery(query.id, { text: 'Akses ditolak', show_alert: true });
 
-      return this.editMsg(chatId, msgId, `📤 <b>Export Data Penelitian</b>\n\nPilih jenis export:`, {
-        inline_keyboard: [
-          [{ text: '📄 Dataset Penelitian', callback_data: 'export_dataset' }],
-          [{ text: '📊 Ringkasan Penelitian', callback_data: 'export_summary' }],
-          [{ text: '⬅️ Kembali', callback_data: 'nav_research_stats' }]
-        ]
-      });
-    }
-
-    if (data === 'export_dataset') {
-      return this.editMsg(chatId, msgId, `📄 <b>Export Dataset Penelitian</b>\n\nPilih periode waktu data yang ingin di-export:`, {
-        inline_keyboard: [
-          [{ text: '⚡ 24 Jam Terakhir', callback_data: 'exp_ds_24h' }],
-          [{ text: '📅 7 Hari Terakhir', callback_data: 'exp_ds_7d' }],
-          [{ text: '🗓️ 30 Hari Terakhir', callback_data: 'exp_ds_30d' }],
-          [{ text: '🌐 Semua Data', callback_data: 'exp_ds_all' }],
-          [{ text: '⬅️ Kembali', callback_data: 'export_menu' }]
-        ]
-      });
-    }
-
-    if (data === 'export_summary') {
-      return this.editMsg(chatId, msgId, `📊 <b>Export Ringkasan Penelitian</b>\n\nPilih periode waktu data yang ingin di-export:`, {
+      return this.editMsg(chatId, msgId, `📊 <b>Export Statistik Penelitian</b>\n\nPilih periode waktu data yang ingin di-export:`, {
         inline_keyboard: [
           [{ text: '⚡ 24 Jam Terakhir', callback_data: 'exp_sm_24h' }],
           [{ text: '📅 7 Hari Terakhir', callback_data: 'exp_sm_7d' }],
           [{ text: '🗓️ 30 Hari Terakhir', callback_data: 'exp_sm_30d' }],
           [{ text: '🌐 Semua Data', callback_data: 'exp_sm_all' }],
-          [{ text: '⬅️ Kembali', callback_data: 'export_menu' }]
+          [{ text: '⬅️ Kembali', callback_data: 'nav_research_stats' }]
         ]
       });
     }
 
-    if (data.startsWith('exp_ds_')) {
-      const period = data.replace('exp_ds_', '');
-      return this.handleDatasetExport(chatId, query, period);
+    if (data === 'export_summary' || data === 'export_dataset') {
+      return this.editMsg(chatId, msgId, `📊 <b>Export Statistik Penelitian</b>\n\nPilih periode waktu data yang ingin di-export:`, {
+        inline_keyboard: [
+          [{ text: '⚡ 24 Jam Terakhir', callback_data: 'exp_sm_24h' }],
+          [{ text: '📅 7 Hari Terakhir', callback_data: 'exp_sm_7d' }],
+          [{ text: '🗓️ 30 Hari Terakhir', callback_data: 'exp_sm_30d' }],
+          [{ text: '🌐 Semua Data', callback_data: 'exp_sm_all' }],
+          [{ text: '⬅️ Kembali', callback_data: 'nav_research_stats' }]
+        ]
+      });
     }
 
-    if (data.startsWith('exp_sm_')) {
-      const period = data.replace('exp_sm_', '');
+    if (data.startsWith('exp_ds_') || data.startsWith('exp_sm_')) {
+      const period = data.replace('exp_ds_', '').replace('exp_sm_', '');
       return this.handleSummaryExport(chatId, query, period);
     }
 

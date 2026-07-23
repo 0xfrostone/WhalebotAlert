@@ -19,8 +19,10 @@ function setupStartCommand(bot, watchlistStore) {
     }
 
     const user = watchlistStore.getWatchlist(chatId, msg.from.first_name);
-    // /start selalu reset status ke MATI — user harus klik "Mulai Tracking" untuk aktif
+    // /start selalu reset status, watchlist, dan alert today ketika memulai
     user.active = false;
+    user.tokens = [];
+    user.alertCount = 0;
     watchlistStore.set(chatId, user);
 
     const tokenCount = user.tokens ? user.tokens.length : 0;
