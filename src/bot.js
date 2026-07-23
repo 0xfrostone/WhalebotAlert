@@ -363,14 +363,14 @@ class InteractiveWhaleBot {
   }
 
   async broadcastAccumulation(accumulationData) {
-    if (this.maintenanceService.isActive()) return 0;
+    if (this.maintenanceService.isActive()) return [];
     
-    let sent = 0;
+    const sentChatIds = [];
     const allSubs = this.watchlistStore.getAllActiveSubscribers();
     
     for (const user of allSubs) {
       const chatId = user.chatId;
-      const hasToken = user.tokens && user.tokens.includes(accumulationData.tokenSymbol);
+      const hasToken = user.tokens instanceof Set ? user.tokens.has(accumulationData.tokenSymbol) : (Array.isArray(user.tokens) ? user.tokens.includes(accumulationData.tokenSymbol) : false);
       
       if (!hasToken) continue;
       
@@ -387,14 +387,14 @@ class InteractiveWhaleBot {
           parse_mode: 'HTML',
           disable_web_page_preview: true
         });
-        sent++;
+        sentChatIds.push(chatId);
       } catch (err) {
         if (err.message.includes('blocked') || err.message.includes('not found')) {
           this.watchlistStore.delete(chatId);
         }
       }
     }
-    return sent;
+    return sentChatIds;
   }
 
   getStats() {

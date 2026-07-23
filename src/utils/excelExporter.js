@@ -4,7 +4,7 @@ const StorageManager = require('../storage/StorageManager');
 const path = require('path');
 
 class ExcelExporter {
-  static generateDatasetExcel(rawAlerts) {
+  static generateDatasetExcel(rawAlerts, periodLabel = 'Semua Waktu') {
     const workbook = XLSX.utils.book_new();
     const alerts = this.normalizeAlerts(rawAlerts);
 
@@ -32,13 +32,14 @@ class ExcelExporter {
     XLSX.utils.book_append_sheet(workbook, datasetSheet, "Data Lengkap");
 
     const today = new Date().toISOString().split('T')[0];
-    const filename = `dataset_penelitian_${today}.xlsx`;
+    const safeTag = periodLabel.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const filename = `dataset_penelitian_${safeTag}_${today}.xlsx`;
     const filePath = StorageManager.getResearchPath(filename);
     XLSX.writeFile(workbook, filePath);
     return filePath;
   }
 
-  static generateSummaryExcel(rawAlerts, stats) {
+  static generateSummaryExcel(rawAlerts, stats, periodLabel = 'Semua Waktu') {
     const workbook = XLSX.utils.book_new();
     const alerts = this.normalizeAlerts(rawAlerts);
 
@@ -57,18 +58,19 @@ class ExcelExporter {
 
     const summaryData = [
       ["PERIODE PEMANTAUAN"],
-      ["Waktu Mulai", stats.monitoring_start_date ? new Date(stats.monitoring_start_date).toLocaleString('id-ID') : 'Tidak Diketahui'],
-      ["Waktu Selesai", new Date().toLocaleString('id-ID')],
-      ["Lama Pemantauan", `${monitoringHours.toFixed(2)} Jam (${(monitoringHours / 24).toFixed(1)} Hari)`],
+      ["Filter Periode Data", periodLabel],
+      ["Waktu Mulai Sistem", stats.monitoring_start_date ? new Date(stats.monitoring_start_date).toLocaleString('id-ID') : 'Tidak Diketahui'],
+      ["Waktu Selesai / Export", new Date().toLocaleString('id-ID')],
+      ["Lama Pemantauan Sistem", `${monitoringHours.toFixed(2)} Jam (${(monitoringHours / 24).toFixed(1)} Hari)`],
       [""],
       ["STATISTIK DETEKSI WHALE (PAUS)"],
-      ["Total Transaksi Terpantau", stats.total_events || 0],
-      ["Total Paus Ditemukan", stats.total_whale_alerts || 0],
-      ["Total Notifikasi Dikirim", stats.total_alerts_sent || 0],
+      ["Total Transaksi Terpantau Sistem", stats.total_events || 0],
+      ["Total Alert Dalam Periode Ini", alerts.length],
       ["Total Aktivitas Pembelian", alerts.filter(a => a.transactionType === 'BUY').length],
       ["Total Aktivitas Penjualan", alerts.filter(a => a.transactionType === 'SELL').length],
       [""],
-      ["RANGKUMAN ANGKA"],
+      ["RANGKUMAN ANGKA (PERIODE FILTERED)"],
+      ["Total Volume Transaksi (USD)", totalVolume.toFixed(2)],
       ["Rata-Rata Skor Paus", avgScore.toFixed(2)],
       ["Skor Paus Tertinggi", maxScore],
       ["Rata-Rata Efek ke Harga Pasar (%)", avgImpact.toFixed(4)],
@@ -77,7 +79,7 @@ class ExcelExporter {
       ["Nilai Transaksi Terbesar (USD)", maxTxValue.toFixed(2)]
     ];
     const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-    summarySheet['!cols'] = [{ wch: 30 }, { wch: 40 }];
+    summarySheet['!cols'] = [{ wch: 35 }, { wch: 40 }];
     XLSX.utils.book_append_sheet(workbook, summarySheet, "Ringkasan Penelitian");
 
     const tokens = {};

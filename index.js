@@ -15,30 +15,36 @@ const { BackupService }        = require('./src/services/backupService');
 const StorageManager = require('./src/storage/StorageManager');
 
 function saveUserAlert(chatId, alertData) {
-  // PHASE 6: Validation
-  if (!alertData.tokenSymbol || !alertData.direction || alertData.usdValue === undefined || !alertData.whaleScore || !alertData.timestamp) {
-    console.warn(`[WARNING] Skipping malformed alert record for user ${chatId}`);
-    return;
-  }
+  if (!alertData) return;
+
+  const symbol = alertData.tokenSymbol || alertData.token || 'UNKNOWN';
+  const direction = alertData.direction || alertData.transactionType || 'UNKNOWN';
+  const usdValue = alertData.usdValue !== undefined ? alertData.usdValue : (alertData.totalVolume || 0);
+  const timestamp = alertData.timestamp || Date.now();
 
   const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
-  
-  // Also clean old corrupted entries silently (Phase 6 cleanup)
-  const cleanedAlerts = alerts.filter(a => a && a.tokenSymbol && a.direction && a.usdValue !== undefined);
+  const cleanedAlerts = alerts.filter(a => a && (a.tokenSymbol || a.token) && (a.direction || a.transactionType));
+
+  const scoreTotal = alertData.whaleScore?.total !== undefined ? alertData.whaleScore.total : (typeof alertData.whaleScore === 'number' ? alertData.whaleScore : 50);
 
   const record = {
     ...alertData,
     id: cleanedAlerts.length > 0 ? (cleanedAlerts[0].id || cleanedAlerts.length) + 1 : 1,
-    dateTime: new Date(alertData.timestamp).toLocaleString('id-ID'),
-    token: alertData.tokenSymbol,
-    transactionType: alertData.direction,
-    valueUSD: alertData.usdValue,
-    valueETH: alertData.amountIn || alertData.amountOut || 0,
-    savedAt: new Date().toISOString()
+    timestamp: timestamp,
+    dateTime: alertData.dateTime || new Date(timestamp).toLocaleString('id-ID'),
+    token: symbol,
+    tokenSymbol: symbol,
+    direction: direction,
+    transactionType: direction,
+    valueUSD: usdValue,
+    usdValue: usdValue,
+    whaleScore: scoreTotal,
+    lpImpactPct: alertData.lpImpactPct || alertData.combinedImpactPct || alertData.liquidityImpactPct || 0,
+    valueETH: alertData.amountIn || alertData.amountOut || alertData.valueETH || 0,
+    savedAt: new Date(timestamp).toISOString()
   };
 
   cleanedAlerts.unshift(record);
-  
   if (cleanedAlerts.length > 1000) cleanedAlerts.splice(1000);
   StorageManager.writeUserJSON(chatId, 'alerts.json', cleanedAlerts);
 }
@@ -201,7 +207,24 @@ async function main() {
         if (accumulationEvent) {
           console.log(`🐳 [ACCUMULATION DETECTED] ${accumulationEvent.wallet} accumulated ${accumulationEvent.tokenSymbol}`);
           if (bot.broadcastAccumulation) {
-            await bot.broadcastAccumulation(accumulationEvent);
+            const accumChatIds = await bot.broadcastAccumulation(accumulationEvent);
+            if (Array.isArray(accumChatIds) && accumChatIds.length > 0) {
+              for (const chatId of accumChatIds) {
+                saveUserAlert(chatId, {
+                  tokenSymbol: accumulationEvent.tokenSymbol,
+                  direction: accumulationEvent.direction,
+                  usdValue: accumulationEvent.totalVolume,
+                  lpImpactPct: accumulationEvent.combinedImpactPct,
+                  whaleScore: { total: 85 },
+                  riskCategory: accumulationEvent.riskLevel,
+                  wallet: accumulationEvent.wallet,
+                  txHash: accumulationEvent.txHashes ? accumulationEvent.txHashes[0] : swapData.txHash,
+                  dex: accumulationEvent.dexes ? accumulationEvent.dexes.join(', ') : 'Uniswap',
+                  timestamp: Date.now(),
+                  isAccumulation: true
+                });
+              }
+            }
           }
         }
       }

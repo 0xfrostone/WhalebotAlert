@@ -137,7 +137,7 @@ class CallbackHandler {
     if (data === 'export_menu') {
       if (!isAdmin) return this.bot.answerCallbackQuery(query.id, { text: 'Akses ditolak', show_alert: true });
 
-      return this.editMsg(chatId, msgId, `📤 <b>Export Data</b>\n\nPilih jenis export:`, {
+      return this.editMsg(chatId, msgId, `📤 <b>Export Data Penelitian</b>\n\nPilih jenis export:`, {
         inline_keyboard: [
           [{ text: '📄 Dataset Penelitian', callback_data: 'export_dataset' }],
           [{ text: '📊 Ringkasan Penelitian', callback_data: 'export_summary' }],
@@ -147,53 +147,37 @@ class CallbackHandler {
     }
 
     if (data === 'export_dataset') {
-      try {
-        const StorageManager = require('../storage/StorageManager');
-        const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
-        
-        if (alerts.length === 0) {
-          return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
-        }
-
-        const { ExcelExporter } = require('../utils/excelExporter');
-        const filePath = ExcelExporter.generateDatasetExcel(alerts);
-
-        await this.bot.sendDocument(chatId, filePath, {
-          caption: '📊 <b>Dataset Penelitian</b>\n\nSeluruh data transaksi whale mentah dalam format Excel (XLSX).',
-          parse_mode: 'HTML'
-        });
-        
-        return this.bot.answerCallbackQuery(query.id, { text: 'Dataset berhasil dikirim!', show_alert: false });
-      } catch (err) {
-        console.error('Export Dataset error:', err);
-        return this.bot.sendMessage(chatId, `❌ Gagal export dataset: ${err.message}`);
-      }
+      return this.editMsg(chatId, msgId, `📄 <b>Export Dataset Penelitian</b>\n\nPilih periode waktu data yang ingin di-export:`, {
+        inline_keyboard: [
+          [{ text: '⚡ 24 Jam Terakhir', callback_data: 'exp_ds_24h' }],
+          [{ text: '📅 7 Hari Terakhir', callback_data: 'exp_ds_7d' }],
+          [{ text: '🗓️ 30 Hari Terakhir', callback_data: 'exp_ds_30d' }],
+          [{ text: '🌐 Semua Data', callback_data: 'exp_ds_all' }],
+          [{ text: '⬅️ Kembali', callback_data: 'export_menu' }]
+        ]
+      });
     }
 
     if (data === 'export_summary') {
-      try {
-        const StorageManager = require('../storage/StorageManager');
-        const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
-        
-        if (alerts.length === 0) {
-          return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
-        }
+      return this.editMsg(chatId, msgId, `📊 <b>Export Ringkasan Penelitian</b>\n\nPilih periode waktu data yang ingin di-export:`, {
+        inline_keyboard: [
+          [{ text: '⚡ 24 Jam Terakhir', callback_data: 'exp_sm_24h' }],
+          [{ text: '📅 7 Hari Terakhir', callback_data: 'exp_sm_7d' }],
+          [{ text: '🗓️ 30 Hari Terakhir', callback_data: 'exp_sm_30d' }],
+          [{ text: '🌐 Semua Data', callback_data: 'exp_sm_all' }],
+          [{ text: '⬅️ Kembali', callback_data: 'export_menu' }]
+        ]
+      });
+    }
 
-        const { ExcelExporter } = require('../utils/excelExporter');
-        const rs = this.appBot.researchStore.getStats();
-        rs.total_alerts_sent = alerts.length;
-        const filePath = ExcelExporter.generateSummaryExcel(alerts, rs);
+    if (data.startsWith('exp_ds_')) {
+      const period = data.replace('exp_ds_', '');
+      return this.handleDatasetExport(chatId, query, period);
+    }
 
-        await this.bot.sendDocument(chatId, filePath, {
-          caption: '📊 <b>Ringkasan Penelitian</b>\n\nLaporan komprehensif berisi statistik, aktivitas token, dan ringkasan angka penelitian (XLSX).',
-          parse_mode: 'HTML'
-        });
-        
-        return this.bot.answerCallbackQuery(query.id, { text: 'Ringkasan berhasil dikirim!', show_alert: false });
-      } catch (err) {
-        console.error('Export Summary error:', err);
-        return this.bot.sendMessage(chatId, `❌ Gagal export summary: ${err.message}`);
-      }
+    if (data.startsWith('exp_sm_')) {
+      const period = data.replace('exp_sm_', '');
+      return this.handleSummaryExport(chatId, query, period);
     }
 
     // ——— BACK COMPATIBILITY ———
@@ -512,6 +496,89 @@ class CallbackHandler {
         `❌ <b>Menu ditutup</b>`,
         { inline_keyboard: [[]] }
       );
+    }
+  }
+
+  filterAlertsByTime(alerts, period) {
+    if (!period || period === 'all') return { filteredAlerts: alerts, label: 'Semua Waktu' };
+    const now = Date.now();
+    let maxMs = 0;
+    let label = 'Semua Waktu';
+    if (period === '24h') {
+      maxMs = 24 * 60 * 60 * 1000;
+      label = '24 Jam Terakhir';
+    } else if (period === '7d') {
+      maxMs = 7 * 24 * 60 * 60 * 1000;
+      label = '7 Hari Terakhir';
+    } else if (period === '30d') {
+      maxMs = 30 * 24 * 60 * 60 * 1000;
+      label = '30 Hari Terakhir';
+    }
+
+    const filteredAlerts = alerts.filter(a => {
+      const ts = a.timestamp || (a.savedAt ? new Date(a.savedAt).getTime() : 0);
+      if (!ts) return true;
+      return (now - ts) <= maxMs;
+    });
+
+    return { filteredAlerts, label };
+  }
+
+  async handleDatasetExport(chatId, query, period) {
+    try {
+      const StorageManager = require('../storage/StorageManager');
+      const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
+      if (alerts.length === 0) {
+        return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
+      }
+
+      const { filteredAlerts, label } = this.filterAlertsByTime(alerts, period);
+      if (filteredAlerts.length === 0) {
+        return this.bot.sendMessage(chatId, `❌ Tidak ada data alert dalam periode ${label}.`);
+      }
+
+      const { ExcelExporter } = require('../utils/excelExporter');
+      const filePath = ExcelExporter.generateDatasetExcel(filteredAlerts, label);
+
+      await this.bot.sendDocument(chatId, filePath, {
+        caption: `📊 <b>Dataset Penelitian (${label})</b>\n\nSeluruh data transaksi whale mentah (${filteredAlerts.length} record) dalam format Excel (XLSX).`,
+        parse_mode: 'HTML'
+      });
+      
+      return this.bot.answerCallbackQuery(query.id, { text: `Dataset ${label} berhasil dikirim!`, show_alert: false });
+    } catch (err) {
+      console.error('Export Dataset error:', err);
+      return this.bot.sendMessage(chatId, `❌ Gagal export dataset: ${err.message}`);
+    }
+  }
+
+  async handleSummaryExport(chatId, query, period) {
+    try {
+      const StorageManager = require('../storage/StorageManager');
+      const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
+      if (alerts.length === 0) {
+        return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
+      }
+
+      const { filteredAlerts, label } = this.filterAlertsByTime(alerts, period);
+      if (filteredAlerts.length === 0) {
+        return this.bot.sendMessage(chatId, `❌ Tidak ada data alert dalam periode ${label}.`);
+      }
+
+      const { ExcelExporter } = require('../utils/excelExporter');
+      const rs = this.appBot.researchStore ? this.appBot.researchStore.getStats() : {};
+      rs.total_alerts_sent = filteredAlerts.length;
+      const filePath = ExcelExporter.generateSummaryExcel(filteredAlerts, rs, label);
+
+      await this.bot.sendDocument(chatId, filePath, {
+        caption: `📊 <b>Ringkasan Penelitian (${label})</b>\n\nLaporan komprehensif berisi statistik, aktivitas token, dan ringkasan angka penelitian (${filteredAlerts.length} record) dalam format Excel (XLSX).`,
+        parse_mode: 'HTML'
+      });
+      
+      return this.bot.answerCallbackQuery(query.id, { text: `Ringkasan ${label} berhasil dikirim!`, show_alert: false });
+    } catch (err) {
+      console.error('Export Summary error:', err);
+      return this.bot.sendMessage(chatId, `❌ Gagal export summary: ${err.message}`);
     }
   }
 
