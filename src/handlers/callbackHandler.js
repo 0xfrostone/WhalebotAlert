@@ -578,6 +578,26 @@ class CallbackHandler {
     }
   }
 
+  getAlertTimestamp(a) {
+    if (!a) return 0;
+    if (typeof a.timestamp === 'number' && !isNaN(a.timestamp) && a.timestamp > 0) {
+      return a.timestamp;
+    }
+    if (a.timestamp) {
+      const t = new Date(a.timestamp).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    if (a.savedAt) {
+      const t = new Date(a.savedAt).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    if (a.dateTime) {
+      const t = new Date(a.dateTime).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    return 0;
+  }
+
   filterAlertsByTime(alerts, period) {
     if (!period || period === 'all') return { filteredAlerts: alerts, label: 'Semua Waktu' };
     const now = Date.now();
@@ -595,8 +615,8 @@ class CallbackHandler {
     }
 
     const filteredAlerts = alerts.filter(a => {
-      const ts = a.timestamp || (a.savedAt ? new Date(a.savedAt).getTime() : 0);
-      if (!ts) return true;
+      const ts = this.getAlertTimestamp(a);
+      if (!ts) return false;
       return (now - ts) <= maxMs;
     });
 
@@ -673,20 +693,20 @@ class CallbackHandler {
     if (period === '24h') {
       label = '24 Jam Terakhir';
       alertsToUse = userAlerts.filter(a => {
-        const ts = a.timestamp || (a.savedAt ? new Date(a.savedAt).getTime() : 0);
-        return ts && (now - ts <= 24 * 3600 * 1000);
+        const ts = this.getAlertTimestamp(a);
+        return ts > 0 && (now - ts <= 24 * 3600 * 1000);
       });
     } else if (period === '7d') {
       label = '7 Hari Terakhir';
       alertsToUse = userAlerts.filter(a => {
-        const ts = a.timestamp || (a.savedAt ? new Date(a.savedAt).getTime() : 0);
-        return ts && (now - ts <= 7 * 24 * 3600 * 1000);
+        const ts = this.getAlertTimestamp(a);
+        return ts > 0 && (now - ts <= 7 * 24 * 3600 * 1000);
       });
     } else if (period === '30d') {
       label = '30 Hari Terakhir';
       alertsToUse = userAlerts.filter(a => {
-        const ts = a.timestamp || (a.savedAt ? new Date(a.savedAt).getTime() : 0);
-        return ts && (now - ts <= 30 * 24 * 3600 * 1000);
+        const ts = this.getAlertTimestamp(a);
+        return ts > 0 && (now - ts <= 30 * 24 * 3600 * 1000);
       });
     }
 
@@ -698,7 +718,7 @@ class CallbackHandler {
     let sumImpact = 0;
     let totalWhales = 0;
 
-    if (period !== 'all' && alertsToUse.length > 0) {
+    if (period !== 'all') {
       totalWhales = alertsToUse.length;
       for (const a of alertsToUse) {
         const dir = a.direction || a.transactionType || 'BUY';
@@ -726,17 +746,46 @@ class CallbackHandler {
         sumImpact += impact;
       }
     } else {
-      buyCount = rsGlobal.buy_count || 0;
-      sellCount = rsGlobal.sell_count || 0;
-      tokenStats = rsGlobal.token_stats || {};
-      highestTx = {
-        amount: rsGlobal.highest_transaction ? rsGlobal.highest_transaction.amount || 0 : 0,
-        token: rsGlobal.highest_transaction ? rsGlobal.highest_transaction.token || '-' : '-',
-        timestamp: rsGlobal.highest_transaction && rsGlobal.highest_transaction.timestamp ? new Date(rsGlobal.highest_transaction.timestamp).toLocaleString('id-ID') : '-'
-      };
-      totalWhales = rsGlobal.total_whale_alerts || userAlerts.length;
-      sumScore = rsGlobal.sum_whale_score || 0;
-      sumImpact = rsGlobal.sum_liquidity_impact || 0;
+      if (userAlerts.length > 0) {
+        totalWhales = userAlerts.length;
+        for (const a of userAlerts) {
+          const dir = a.direction || a.transactionType || 'BUY';
+          if (dir === 'BUY') buyCount++;
+          else sellCount++;
+
+          const sym = a.tokenSymbol || a.token || 'UNKNOWN';
+          if (!tokenStats[sym]) tokenStats[sym] = { BUY: 0, SELL: 0 };
+          if (dir === 'BUY') tokenStats[sym].BUY++;
+          else tokenStats[sym].SELL++;
+
+          const usd = a.valueUSD || a.usdValue || 0;
+          if (usd > highestTx.amount) {
+            highestTx = {
+              amount: usd,
+              token: sym,
+              timestamp: a.dateTime || (a.timestamp ? new Date(a.timestamp).toLocaleString('id-ID') : '-')
+            };
+          }
+
+          const score = typeof a.whaleScore === 'number' ? a.whaleScore : (a.whaleScore?.total || 0);
+          sumScore += score;
+
+          const impact = a.lpImpactPct || a.liquidityImpactPct || 0;
+          sumImpact += impact;
+        }
+      } else {
+        buyCount = rsGlobal.buy_count || 0;
+        sellCount = rsGlobal.sell_count || 0;
+        tokenStats = rsGlobal.token_stats || {};
+        highestTx = {
+          amount: rsGlobal.highest_transaction ? rsGlobal.highest_transaction.amount || 0 : 0,
+          token: rsGlobal.highest_transaction ? rsGlobal.highest_transaction.token || '-' : '-',
+          timestamp: rsGlobal.highest_transaction && rsGlobal.highest_transaction.timestamp ? new Date(rsGlobal.highest_transaction.timestamp).toLocaleString('id-ID') : '-'
+        };
+        totalWhales = rsGlobal.total_whale_alerts || 0;
+        sumScore = rsGlobal.sum_whale_score || 0;
+        sumImpact = rsGlobal.sum_liquidity_impact || 0;
+      }
     }
 
     const totalBuySell = buyCount + sellCount;
@@ -748,8 +797,8 @@ class CallbackHandler {
     else if (sellCount > buyCount) sentiment = '🔴 BEARISH (Dominasi Distribusi)';
 
     const divisor = totalWhales || 1;
-    const avgScore = (period === 'all' ? rsGlobal.average_score : (sumScore / divisor)).toFixed(1);
-    const avgImpact = ((period === 'all' ? rsGlobal.average_impact : (sumImpact / divisor)) * 100).toFixed(5);
+    const avgScore = (period === 'all' && userAlerts.length === 0 ? rsGlobal.average_score : (totalWhales > 0 ? sumScore / divisor : 0)).toFixed(1);
+    const avgImpact = ((period === 'all' && userAlerts.length === 0 ? rsGlobal.average_impact : (totalWhales > 0 ? sumImpact / divisor : 0)) * 100).toFixed(5);
 
     const startDate = new Date(rsGlobal.monitoring_start_date).toLocaleString('id-ID');
     const lastDate = new Date().toLocaleString('id-ID');
@@ -769,10 +818,10 @@ class CallbackHandler {
 
     const msgText = [
       `📈 <b>Statistik Penelitian Skripsi</b>`,
-      `⏳ Filter Rentang Waktu: <b>${label}</b>`,
+      `⏳ Rentang Waktu: <b>${label}</b>`,
       `━━━━━━━━━━━━━━━━━━━━`,
       ``,
-      `🎯 <b>Sentimen Pasar Whale:</b>`,
+      `🎯 <b>Sentimen Pasar Whale (${label}):</b>`,
       `<b>${sentiment}</b>`,
       ``,
       `<b>Periode Monitoring System</b>`,
@@ -786,13 +835,13 @@ class CallbackHandler {
       `Whale Terdeteksi: <b>${totalWhales}</b>`,
       `Alert Dikirim: <b>${period === 'all' ? rsGlobal.total_alerts_sent : alertsToUse.length}</b>`,
       ``,
-      `<b>Aktivitas BUY vs SELL</b>`,
+      `<b>Aktivitas BUY vs SELL (${label})</b>`,
       `🟢 BUY : <b>${buyCount} (${buyPct}%)</b>`,
       `🔴 SELL: <b>${sellCount} (${sellPct}%)</b>`,
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
       ``,
-      `<b>Per Token Watchlist</b>${tokensStr}`,
+      `<b>Per Token Watchlist (${label})</b>${tokensStr}`,
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
       ``,
@@ -825,8 +874,8 @@ class CallbackHandler {
           { text: ball, callback_data: 'stats_filter_all' }
         ],
         [
-          { text: '🖼️ Grafik Statistik', callback_data: 'research_chart' },
-          { text: '📄 Laporan PDF/Teks', callback_data: 'export_pdf' }
+          { text: '🖼️ Grafik Statistik', callback_data: `chart_filter_${period}` },
+          { text: '📄 Laporan PDF/Teks', callback_data: `pdf_filter_${period}` }
         ],
         [
           { text: '🔄 Refresh', callback_data: `stats_filter_${period}` },
