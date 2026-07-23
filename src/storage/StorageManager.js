@@ -103,6 +103,42 @@ class StorageManager {
       return false;
     }
   }
+
+  static getAllUsersAlerts() {
+    const usersDir = path.join(STORAGE_DIR, 'users');
+    if (!fs.existsSync(usersDir)) return [];
+    
+    let allAlerts = [];
+    const txHashes = new Set();
+
+    try {
+      const userFolders = fs.readdirSync(usersDir);
+      for (const folder of userFolders) {
+        const alertsPath = path.join(usersDir, folder, 'alerts.json');
+        if (fs.existsSync(alertsPath)) {
+          try {
+            const userAlerts = JSON.parse(fs.readFileSync(alertsPath, 'utf8'));
+            if (Array.isArray(userAlerts)) {
+              for (const alert of userAlerts) {
+                const uniqueKey = `${alert.txHash || ''}_${alert.timestamp || alert.savedAt || ''}`;
+                if (alert.txHash && txHashes.has(uniqueKey)) continue;
+                if (alert.txHash) txHashes.add(uniqueKey);
+                allAlerts.push(alert);
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    } catch (err) {
+      console.error('[StorageManager] Error reading all user alerts:', err.message);
+    }
+
+    return allAlerts.sort((a, b) => {
+      const tsA = a.timestamp || (a.savedAt ? new Date(a.savedAt).getTime() : 0);
+      const tsB = b.timestamp || (b.savedAt ? new Date(b.savedAt).getTime() : 0);
+      return tsB - tsA;
+    });
+  }
 }
 
 module.exports = StorageManager;

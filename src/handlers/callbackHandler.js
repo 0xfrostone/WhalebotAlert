@@ -144,10 +144,11 @@ class CallbackHandler {
       }
     }
 
-    if (data === 'export_pdf') {
+    if (data === 'export_pdf' || data.startsWith('pdf_filter_')) {
       try {
         const StorageManager = require('../storage/StorageManager');
-        const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
+        const allAlerts = StorageManager.getAllUsersAlerts();
+        const alerts = allAlerts.length > 0 ? allAlerts : StorageManager.readUserJSON(chatId, 'alerts.json', []);
         const rs = this.appBot.researchStore.getStats();
 
         const fs = require('fs');
@@ -626,7 +627,8 @@ class CallbackHandler {
   async handleDatasetExport(chatId, query, period) {
     try {
       const StorageManager = require('../storage/StorageManager');
-      const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
+      const allAlerts = StorageManager.getAllUsersAlerts();
+      const alerts = allAlerts.length > 0 ? allAlerts : StorageManager.readUserJSON(chatId, 'alerts.json', []);
       if (alerts.length === 0) {
         return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
       }
@@ -654,7 +656,8 @@ class CallbackHandler {
   async handleSummaryExport(chatId, query, period) {
     try {
       const StorageManager = require('../storage/StorageManager');
-      const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
+      const allAlerts = StorageManager.getAllUsersAlerts();
+      const alerts = allAlerts.length > 0 ? allAlerts : StorageManager.readUserJSON(chatId, 'alerts.json', []);
       if (alerts.length === 0) {
         return this.bot.sendMessage(chatId, 'Belum ada data alert untuk di-export.');
       }
@@ -683,7 +686,8 @@ class CallbackHandler {
 
   async renderResearchStats(chatId, msgId, period = 'all', query = null) {
     const StorageManager = require('../storage/StorageManager');
-    const userAlerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
+    const allAlerts = StorageManager.getAllUsersAlerts();
+    const userAlerts = allAlerts.length > 0 ? allAlerts : StorageManager.readUserJSON(chatId, 'alerts.json', []);
     const rsGlobal = this.appBot.researchStore.getStats();
 
     let alertsToUse = userAlerts;
