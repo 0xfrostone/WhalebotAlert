@@ -120,6 +120,7 @@ class StorageManager {
             const userAlerts = JSON.parse(fs.readFileSync(alertsPath, 'utf8'));
             if (Array.isArray(userAlerts)) {
               for (const alert of userAlerts) {
+                if (alert.txHash && String(alert.txHash).startsWith('0xDEMO_')) continue;
                 const uniqueKey = `${alert.txHash || ''}_${alert.timestamp || alert.savedAt || ''}`;
                 if (alert.txHash && txHashes.has(uniqueKey)) continue;
                 if (alert.txHash) txHashes.add(uniqueKey);

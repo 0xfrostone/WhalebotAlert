@@ -92,24 +92,12 @@ function scheduleNextAlert(bot, watchlistStore, chatId) {
         return;
       }
 
-      const { message, alertRecord } = generateRandomDemoAlert(currentUser.tokens);
+      const { message } = generateRandomDemoAlert(currentUser.tokens);
 
       await bot.sendMessage(chatId, message, {
         parse_mode: 'HTML',
         disable_web_page_preview: true
       });
-
-      // Save to user alerts and research store for thesis stats consistency
-      const StorageManager = require('../storage/StorageManager');
-      const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
-      alertRecord.id = alerts.length + 1;
-      alerts.unshift(alertRecord);
-      if (alerts.length > 1000) alerts.splice(1000);
-      StorageManager.writeUserJSON(chatId, 'alerts.json', alerts);
-
-      if (global.appResearchStore) {
-        global.appResearchStore.recordWhale({}, alertRecord);
-      }
     } catch (err) {
       console.error('[SIMULATOR ERROR]', err.message);
     } finally {
@@ -130,23 +118,12 @@ function startDeteksiSimulator(bot, watchlistStore, chatId) {
     try {
       const user = watchlistStore.getWatchlist(chatId);
       if (user && user.deteksiMode) {
-        const { message, alertRecord } = generateRandomDemoAlert(user.tokens);
+        const { message } = generateRandomDemoAlert(user.tokens);
 
         await bot.sendMessage(chatId, message, {
           parse_mode: 'HTML',
           disable_web_page_preview: true
         });
-
-        const StorageManager = require('../storage/StorageManager');
-        const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
-        alertRecord.id = alerts.length + 1;
-        alerts.unshift(alertRecord);
-        if (alerts.length > 1000) alerts.splice(1000);
-        StorageManager.writeUserJSON(chatId, 'alerts.json', alerts);
-
-        if (global.appResearchStore) {
-          global.appResearchStore.recordWhale({}, alertRecord);
-        }
       }
     } catch (err) {
       console.error('[SIMULATOR FIRST ERROR]', err.message);
