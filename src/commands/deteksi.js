@@ -1,6 +1,4 @@
-// src/commands/deteksi.js
-// Command /deteksi, /deteksi on, /deteksi off
-// Mengatur mode notifikasi deteksi singkat per-user
+const { startDeteksiSimulator, stopDeteksiSimulator } = require('../services/deteksiSimulator');
 
 function setupDeteksiCommand(bot, watchlistStore) {
   bot.onText(/\/deteksi(?:\s+(on|off))?/i, async (msg, match) => {
@@ -12,16 +10,18 @@ function setupDeteksiCommand(bot, watchlistStore) {
     if (arg === 'on') {
       user.deteksiMode = true;
       watchlistStore.saveSettings(chatId, { deteksiMode: true });
+      startDeteksiSimulator(bot, watchlistStore, chatId);
 
       const text = [
-        `⚡ <b>Mode Deteksi Singkat: AKTIF</b>`,
+        `⚡ <b>Mode Deteksi Singkat (Demo Sidang): AKTIF</b>`,
         `━━━━━━━━━━━━━━━━━━━━`,
         ``,
-        `Format alert sekarang beralih ke format ringkas:`,
+        `Simulasi transaksi live ($500 - $1M+) diaktifkan!`,
+        `Alert otomatis terkirim berkala dengan format ringkas:`,
         `🔴 <code>Seseorang baru saja menjual ($TOKEN) Sebesar $68.3K at $3.00</code>`,
-        `🟢 <code>Seseorang baru saja membeli ($TOKEN) Sebesar $68.3K at $3.00</code>`,
+        `🟢 <code>Seseorang baru saja membeli ($TOKEN) Sebesar $120.5K at $18.50</code>`,
         ``,
-        `<i>Gunakan <code>/deteksi off</code> untuk kembali ke format Whale Alert detail.</i>`
+        `<i>Gunakan <code>/deteksi off</code> untuk menghentikan simulasi.</i>`
       ].join('\n');
 
       return bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
@@ -30,14 +30,15 @@ function setupDeteksiCommand(bot, watchlistStore) {
     if (arg === 'off') {
       user.deteksiMode = false;
       watchlistStore.saveSettings(chatId, { deteksiMode: false });
+      stopDeteksiSimulator(chatId);
 
       const text = [
-        `🐋 <b>Mode Deteksi Singkat: NON-AKTIF</b>`,
+        `🐋 <b>Mode Deteksi Singkat (Demo Sidang): NON-AKTIF</b>`,
         `━━━━━━━━━━━━━━━━━━━━`,
         ``,
-        `Format alert kembali ke laporan Whale Alert komprehensif.`,
+        `Simulasi dihentikan. Bot kembali ke mode pemantauan blockchain normal.`,
         ``,
-        `<i>Gunakan <code>/deteksi on</code> untuk menggunakan format ringkas.</i>`
+        `<i>Gunakan <code>/deteksi on</code> untuk mengaktifkan simulasi sidang.</i>`
       ].join('\n');
 
       return bot.sendMessage(chatId, text, { parse_mode: 'HTML' });

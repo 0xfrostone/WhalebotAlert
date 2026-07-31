@@ -230,13 +230,16 @@ class CallbackHandler {
     }
 
     if (data === 'nav_deteksi' || data === 'deteksi_on' || data === 'deteksi_off') {
+      const { startDeteksiSimulator, stopDeteksiSimulator } = require('../services/deteksiSimulator');
       if (data === 'deteksi_on') {
         user.deteksiMode = true;
         this.appBot.watchlistStore.saveSettings(chatId, { deteksiMode: true });
+        startDeteksiSimulator(this.bot, this.appBot.watchlistStore, chatId);
         this.bot.answerCallbackQuery(query.id, { text: 'Mode Deteksi Singkat AKTIF!', show_alert: false });
       } else if (data === 'deteksi_off') {
         user.deteksiMode = false;
         this.appBot.watchlistStore.saveSettings(chatId, { deteksiMode: false });
+        stopDeteksiSimulator(chatId);
         this.bot.answerCallbackQuery(query.id, { text: 'Mode Deteksi Singkat NON-AKTIF!', show_alert: false });
       }
 

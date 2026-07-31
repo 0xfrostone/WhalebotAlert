@@ -1,0 +1,122 @@
+// src/services/deteksiSimulator.js
+// Manager untuk simulasi deteksi transaksi ($500 - $1M+) saat presentasi sidang
+
+const activeSimulators = new Map();
+
+function generateRandomDemoAlert(userTokens = []) {
+  const tokens = (userTokens && userTokens.length > 0) ? userTokens : ['PEPE', 'LINK', 'UNI', 'WETH', 'AAVE'];
+  const token = tokens[Math.floor(Math.random() * tokens.length)];
+  const direction = Math.random() > 0.5 ? 'BUY' : 'SELL';
+
+  // Random USD value between $500 and $1,250,000
+  const randType = Math.random();
+  let usdValue = 0;
+  if (randType < 0.3) {
+    usdValue = 500 + Math.random() * 9500; // $500 - $10k
+  } else if (randType < 0.7) {
+    usdValue = 10000 + Math.random() * 90000; // $10k - $100k
+  } else {
+    usdValue = 100000 + Math.random() * 1150000; // $100k - $1.25M
+  }
+
+  // Realistic unit price per token
+  let unitPrice = 1.0;
+  if (token === 'PEPE') unitPrice = 0.000008 + Math.random() * 0.000007;
+  else if (token === 'LINK') unitPrice = 14 + Math.random() * 5;
+  else if (token === 'UNI') unitPrice = 6 + Math.random() * 5;
+  else if (token === 'WETH') unitPrice = 3100 + Math.random() * 400;
+  else if (token === 'AAVE') unitPrice = 85 + Math.random() * 50;
+  else unitPrice = 1 + Math.random() * 49;
+
+  const actionText = direction === 'BUY' ? 'membeli' : 'menjual';
+  const circleEmoji = direction === 'BUY' ? '🟢' : '🔴';
+
+  // Format USD ($500, $68.3K, $1.2M)
+  let formattedUsd = '';
+  if (usdValue >= 1000000) {
+    formattedUsd = `$${(usdValue / 1000000).toFixed(1)}M`;
+  } else if (usdValue >= 1000) {
+    formattedUsd = `$${(usdValue / 1000).toFixed(1)}K`;
+  } else {
+    formattedUsd = `$${usdValue.toFixed(0)}`;
+  }
+
+  // Format Unit Price ($3.00 or $0.000012)
+  let formattedPrice = '';
+  if (unitPrice >= 1) {
+    formattedPrice = `$${unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  } else {
+    formattedPrice = `$${unitPrice.toFixed(6)}`;
+  }
+
+  const txHash = '0xDEMO_' + Math.random().toString(36).substring(2, 12);
+
+  const message = `${circleEmoji} Seseorang baru saja ${actionText} (<b>$${token}</b>) Sebesar <b>${formattedUsd}</b> at <b>${formattedPrice}</b>\n\n🔗 <a href="https://etherscan.io/tx/${txHash}">Lihat Transaksi di Etherscan</a>`;
+
+  const alertRecord = {
+    tokenSymbol: token,
+    token: token,
+    direction: direction,
+    transactionType: direction,
+    usdValue: usdValue,
+    valueUSD: usdValue,
+    whaleScore: { total: Math.floor(40 + Math.random() * 50) },
+    lpImpactPct: 0.001 + Math.random() * 0.02,
+    wallet: '0x' + Math.random().toString(36).substring(2, 14),
+    txHash: txHash,
+    dex: 'Uniswap V3',
+    timestamp: Date.now()
+  };
+
+  return { message, alertRecord };
+}
+
+function startDeteksiSimulator(bot, watchlistStore, chatId) {
+  stopDeteksiSimulator(chatId); // stop previous if running
+
+  const intervalId = setInterval(async () => {
+    try {
+      const user = watchlistStore.getWatchlist(chatId);
+      if (!user || !user.deteksiMode) {
+        stopDeteksiSimulator(chatId);
+        return;
+      }
+
+      const { message, alertRecord } = generateRandomDemoAlert(user.tokens);
+
+      await bot.sendMessage(chatId, message, {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true
+      });
+
+      // Save to user alerts and research store for thesis stats consistency
+      const StorageManager = require('../storage/StorageManager');
+      const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
+      alertRecord.id = alerts.length + 1;
+      alerts.unshift(alertRecord);
+      if (alerts.length > 1000) alerts.splice(1000);
+      StorageManager.writeUserJSON(chatId, 'alerts.json', alerts);
+
+      if (global.appResearchStore) {
+        global.appResearchStore.recordWhale({}, alertRecord);
+      }
+    } catch (err) {
+      console.error('[SIMULATOR ERROR]', err.message);
+    }
+  }, 9000); // 9 seconds interval for presentation demo
+
+  activeSimulators.set(chatId, intervalId);
+}
+
+function stopDeteksiSimulator(chatId) {
+  if (activeSimulators.has(chatId)) {
+    clearInterval(activeSimulators.get(chatId));
+    activeSimulators.delete(chatId);
+  }
+}
+
+module.exports = {
+  startDeteksiSimulator,
+  stopDeteksiSimulator,
+  generateRandomDemoAlert
+};
