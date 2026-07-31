@@ -112,12 +112,7 @@ class NotificationService {
       formattedPrice = '$0';
     }
 
-    const mainLine = `${circleEmoji} Seseorang baru saja ${actionText} (<b>$${tokenSymbol}</b>) Sebesar <b>${formattedUsd}</b> at <b>${formattedPrice}</b>`;
-
-    if (txHash && txHash !== 'N/A') {
-      return `${mainLine}\n\n🔗 <a href="https://etherscan.io/tx/${txHash}">Lihat Transaksi di Etherscan</a>`;
-    }
-    return mainLine;
+    return `${circleEmoji} Seseorang baru saja ${actionText} (<b>$${tokenSymbol}</b>) Sebesar <b>${formattedUsd}</b> at <b>${formattedPrice}</b>`;
   }
 }
 

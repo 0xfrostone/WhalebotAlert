@@ -11,37 +11,14 @@ function setupDeteksiCommand(bot, watchlistStore) {
       user.deteksiMode = true;
       watchlistStore.saveSettings(chatId, { deteksiMode: true });
       startDeteksiSimulator(bot, watchlistStore, chatId);
-
-      const text = [
-        `⚡ <b>Mode Deteksi Singkat (Demo Sidang): AKTIF</b>`,
-        `━━━━━━━━━━━━━━━━━━━━`,
-        ``,
-        `Simulasi transaksi live ($500 - $1M+) diaktifkan!`,
-        `Alert otomatis terkirim berkala dengan format ringkas:`,
-        `🔴 <code>Seseorang baru saja menjual ($TOKEN) Sebesar $68.3K at $3.00</code>`,
-        `🟢 <code>Seseorang baru saja membeli ($TOKEN) Sebesar $120.5K at $18.50</code>`,
-        ``,
-        `<i>Gunakan <code>/deteksi off</code> untuk menghentikan simulasi.</i>`
-      ].join('\n');
-
-      return bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
+      return;
     }
 
     if (arg === 'off') {
       user.deteksiMode = false;
       watchlistStore.saveSettings(chatId, { deteksiMode: false });
       stopDeteksiSimulator(chatId);
-
-      const text = [
-        `🐋 <b>Mode Deteksi Singkat (Demo Sidang): NON-AKTIF</b>`,
-        `━━━━━━━━━━━━━━━━━━━━`,
-        ``,
-        `Simulasi dihentikan. Bot kembali ke mode pemantauan blockchain normal.`,
-        ``,
-        `<i>Gunakan <code>/deteksi on</code> untuk mengaktifkan simulasi sidang.</i>`
-      ].join('\n');
-
-      return bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
+      return;
     }
 
     // Jika tanpa argumen: tampilkan status & tombol toggle
