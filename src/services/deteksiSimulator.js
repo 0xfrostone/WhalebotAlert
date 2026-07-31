@@ -71,18 +71,25 @@ function generateRandomDemoAlert(userTokens = []) {
   return { message, alertRecord };
 }
 
-function startDeteksiSimulator(bot, watchlistStore, chatId) {
-  stopDeteksiSimulator(chatId); // stop previous if running
+function scheduleNextAlert(bot, watchlistStore, chatId) {
+  const user = watchlistStore.getWatchlist(chatId);
+  if (!user || !user.deteksiMode) {
+    stopDeteksiSimulator(chatId);
+    return;
+  }
 
-  const intervalId = setInterval(async () => {
+  // Jeda acak antara 15 detik sampai 25 detik agar tidak spam saat sidang
+  const randomDelayMs = 15000 + Math.floor(Math.random() * 10000);
+
+  const timeoutId = setTimeout(async () => {
     try {
-      const user = watchlistStore.getWatchlist(chatId);
-      if (!user || !user.deteksiMode) {
+      const currentUser = watchlistStore.getWatchlist(chatId);
+      if (!currentUser || !currentUser.deteksiMode) {
         stopDeteksiSimulator(chatId);
         return;
       }
 
-      const { message, alertRecord } = generateRandomDemoAlert(user.tokens);
+      const { message, alertRecord } = generateRandomDemoAlert(currentUser.tokens);
 
       await bot.sendMessage(chatId, message, {
         parse_mode: 'HTML',
@@ -102,15 +109,55 @@ function startDeteksiSimulator(bot, watchlistStore, chatId) {
       }
     } catch (err) {
       console.error('[SIMULATOR ERROR]', err.message);
+    } finally {
+      if (activeSimulators.has(chatId)) {
+        scheduleNextAlert(bot, watchlistStore, chatId);
+      }
     }
-  }, 9000); // 9 seconds interval for presentation demo
+  }, randomDelayMs);
 
-  activeSimulators.set(chatId, intervalId);
+  activeSimulators.set(chatId, timeoutId);
+}
+
+function startDeteksiSimulator(bot, watchlistStore, chatId) {
+  stopDeteksiSimulator(chatId); // stop previous if running
+
+  // Notif pertama muncul 5 detik setelah /deteksi on
+  const initialTimeout = setTimeout(async () => {
+    try {
+      const user = watchlistStore.getWatchlist(chatId);
+      if (user && user.deteksiMode) {
+        const { message, alertRecord } = generateRandomDemoAlert(user.tokens);
+
+        await bot.sendMessage(chatId, message, {
+          parse_mode: 'HTML',
+          disable_web_page_preview: true
+        });
+
+        const StorageManager = require('../storage/StorageManager');
+        const alerts = StorageManager.readUserJSON(chatId, 'alerts.json', []);
+        alertRecord.id = alerts.length + 1;
+        alerts.unshift(alertRecord);
+        if (alerts.length > 1000) alerts.splice(1000);
+        StorageManager.writeUserJSON(chatId, 'alerts.json', alerts);
+
+        if (global.appResearchStore) {
+          global.appResearchStore.recordWhale({}, alertRecord);
+        }
+      }
+    } catch (err) {
+      console.error('[SIMULATOR FIRST ERROR]', err.message);
+    } finally {
+      scheduleNextAlert(bot, watchlistStore, chatId);
+    }
+  }, 5000);
+
+  activeSimulators.set(chatId, initialTimeout);
 }
 
 function stopDeteksiSimulator(chatId) {
   if (activeSimulators.has(chatId)) {
-    clearInterval(activeSimulators.get(chatId));
+    clearTimeout(activeSimulators.get(chatId));
     activeSimulators.delete(chatId);
   }
 }
