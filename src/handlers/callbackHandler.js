@@ -849,11 +849,15 @@ class CallbackHandler {
 
     let tokensStr = '';
     if (Object.keys(tokenStats).length > 0) {
-      for (const [sym, stats] of Object.entries(tokenStats)) {
-        tokensStr += `\n${sym}: BUY ${stats.BUY} | SELL ${stats.SELL}`;
-      }
+      const lines = Object.entries(tokenStats).map(([sym, stats]) => {
+        const sPad = sym.padEnd(5, ' ');
+        const bPad = String(stats.BUY).padStart(4, ' ');
+        const lPad = String(stats.SELL).padStart(4, ' ');
+        return `${sPad}: BUY ${bPad} | SELL ${lPad}`;
+      });
+      tokensStr = '\n<code>' + lines.join('\n') + '</code>';
     } else {
-      tokensStr = '\nBelum ada data token.';
+      tokensStr = '\n<i>Belum ada data token.</i>';
     }
 
     const { formatUSD } = require('../utils/formatter');

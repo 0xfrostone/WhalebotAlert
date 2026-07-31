@@ -54,7 +54,7 @@ function generateRandomDemoAlert(userTokens = []) {
 
   const txHash = '0xDEMO_' + Math.random().toString(36).substring(2, 12);
 
-  const message = `${circleEmoji} Seseorang baru saja ${actionText} (<b>$${token}</b>) Sebesar <b>${formattedUsd}</b> at <b>${formattedPrice}</b>`;
+  const message = `${circleEmoji} Seseorang baru saja ${actionText} <b>$${token}</b> Sebesar <b>${formattedUsd}</b> at <b>${formattedPrice}</b>`;
 
   const alertRecord = {
     tokenSymbol: token,
