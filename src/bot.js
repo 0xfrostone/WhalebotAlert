@@ -14,6 +14,7 @@ const { setupMaintenanceCommand } = require('./commands/maintenance');
 const { TokenHandler } = require('./handlers/tokenHandler');
 const { ThresholdHandler } = require('./handlers/thresholdHandler');
 const { createStatusIcon, formatUSDLog, debugFormatUSD } = require('./utils/formatter');
+const { ResearchHandler } = require('./handlers/researchHandler');
 const { setupResearchCommand } = require('./commands/research');
 const { setupTestAlertCommand } = require('./commands/testalert');
 const { setupDeteksiCommand } = require('./commands/deteksi');
