@@ -229,6 +229,43 @@ class CallbackHandler {
       });
     }
 
+    if (data === 'nav_deteksi' || data === 'deteksi_on' || data === 'deteksi_off') {
+      if (data === 'deteksi_on') {
+        user.deteksiMode = true;
+        this.appBot.watchlistStore.saveSettings(chatId, { deteksiMode: true });
+        this.bot.answerCallbackQuery(query.id, { text: 'Mode Deteksi Singkat AKTIF!', show_alert: false });
+      } else if (data === 'deteksi_off') {
+        user.deteksiMode = false;
+        this.appBot.watchlistStore.saveSettings(chatId, { deteksiMode: false });
+        this.bot.answerCallbackQuery(query.id, { text: 'Mode Deteksi Singkat NON-AKTIF!', show_alert: false });
+      }
+
+      const isDeteksiOn = !!user.deteksiMode;
+      const statusText = isDeteksiOn ? '🟢 <b>AKTIF</b> (Format Ringkas)' : '🔴 <b>NON-AKTIF</b> (Format Detail)';
+
+      const text = [
+        `⚡ <b>Pengaturan Mode Deteksi Singkat (/deteksi)</b>`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        ``,
+        `Status Mode Deteksi saat ini: ${statusText}`,
+        ``,
+        `<b>Contoh Tampilan Notifikasi Saat Aktif:</b>`,
+        `🔴 Seseorang baru saja menjual (<b>$PEPE</b>) Sebesar <b>$68.3K</b> at <b>$0.000012</b>`,
+        `🟢 Seseorang baru saja membeli (<b>$LINK</b>) Sebesar <b>$120.5K</b> at <b>$18.50</b>`,
+        ``,
+        `Pilih status yang kamu inginkan:`
+      ].join('\n');
+
+      return this.editMsg(chatId, msgId, text, {
+        inline_keyboard: [
+          [
+            { text: isDeteksiOn ? '🔴 Matikan Mode Deteksi' : '🟢 Aktifkan Mode Deteksi', callback_data: isDeteksiOn ? 'deteksi_off' : 'deteksi_on' }
+          ],
+          [{ text: '⬅️ Kembali', callback_data: 'nav_settings' }]
+        ]
+      });
+    }
+
     if (data === 'export_menu') {
       if (!isAdmin) return this.bot.answerCallbackQuery(query.id, { text: 'Akses ditolak', show_alert: true });
 

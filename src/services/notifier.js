@@ -94,6 +94,31 @@ class NotificationService {
       `${emoji[riskLevel] || 'ℹ️'} Tingkat Risiko: <b>${riskLabel[riskLevel] || riskLevel}</b>`
     ].join('\n');
   }
+  static formatSimpleDetectionAlert(data) {
+    const { tokenSymbol, direction, usdValue, amountIn, amountOut, txHash } = data;
+    const tokenAmount = direction === 'BUY' ? (amountOut || 1) : (amountIn || 1);
+    const unitPrice = (usdValue && tokenAmount > 0) ? (usdValue / tokenAmount) : 0;
+
+    const actionText = direction === 'BUY' ? 'membeli' : 'menjual';
+    const circleEmoji = direction === 'BUY' ? '🟢' : '🔴';
+
+    const formattedUsd = formatUSD(usdValue);
+    let formattedPrice = '';
+    if (unitPrice >= 1) {
+      formattedPrice = `$${unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    } else if (unitPrice > 0) {
+      formattedPrice = `$${unitPrice.toFixed(6)}`;
+    } else {
+      formattedPrice = '$0';
+    }
+
+    const mainLine = `${circleEmoji} Seseorang baru saja ${actionText} (<b>$${tokenSymbol}</b>) Sebesar <b>${formattedUsd}</b> at <b>${formattedPrice}</b>`;
+
+    if (txHash && txHash !== 'N/A') {
+      return `${mainLine}\n\n🔗 <a href="https://etherscan.io/tx/${txHash}">Lihat Transaksi di Etherscan</a>`;
+    }
+    return mainLine;
+  }
 }
 
 module.exports = { NotificationService };

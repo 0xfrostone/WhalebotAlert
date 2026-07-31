@@ -14,9 +14,9 @@ const { setupMaintenanceCommand } = require('./commands/maintenance');
 const { TokenHandler } = require('./handlers/tokenHandler');
 const { ThresholdHandler } = require('./handlers/thresholdHandler');
 const { createStatusIcon, formatUSDLog, debugFormatUSD } = require('./utils/formatter');
-const { ResearchHandler } = require('./handlers/researchHandler');
 const { setupResearchCommand } = require('./commands/research');
 const { setupTestAlertCommand } = require('./commands/testalert');
+const { setupDeteksiCommand } = require('./commands/deteksi');
 
 class InteractiveWhaleBot {
   constructor(token) {
@@ -84,7 +84,8 @@ class InteractiveWhaleBot {
     setupMaintenanceCommand(this.bot);
     setupResearchCommand(this.bot);
     setupTestAlertCommand(this.bot, this.watchlistStore);
-    console.log('🧪 /testalert command registered (temporary debug command)');
+    setupDeteksiCommand(this.bot, this.watchlistStore);
+    console.log('⚡ /deteksi command registered');
 
     // Catch-all message handler for conversational state (e.g. AWAITING_CONTRACT)
     this.bot.on('message', async (msg) => {
@@ -214,6 +215,7 @@ class InteractiveWhaleBot {
       inline_keyboard: [
         [ { text: '👀 Watchlist', callback_data: 'nav_watchlist' } ],
         [ { text: '🎯 Threshold', callback_data: 'nav_threshold' } ],
+        [ { text: '⚡ Mode Deteksi Singkat', callback_data: 'nav_deteksi' } ],
         [ { text: '⬅️ Kembali', callback_data: 'nav_main' } ]
       ]
     };
@@ -317,8 +319,11 @@ class InteractiveWhaleBot {
       try {
         console.log(`   📤 [SENDING] Preparing Telegram message for ${chatId} (${user.name})...`);
         const { NotificationService } = require('./services/notifier');
-        const message = NotificationService.formatWhaleAlert(alertData);
-        console.log(`   📤 [SENDING] Message formatted (${message.length} chars), calling sendMessage...`);
+        const isSimpleMode = !!user.deteksiMode;
+        const message = isSimpleMode
+          ? NotificationService.formatSimpleDetectionAlert(alertData)
+          : NotificationService.formatWhaleAlert(alertData);
+        console.log(`   📤 [SENDING] Message formatted (${message.length} chars, simpleMode=${isSimpleMode}), calling sendMessage...`);
 
         await this.bot.sendMessage(chatId, message, {
           parse_mode: 'HTML',
