@@ -4,8 +4,13 @@
 const activeSimulators = new Map();
 
 function generateRandomDemoAlert(userTokens = []) {
-  const tokens = (userTokens && userTokens.length > 0) ? userTokens : ['PEPE', 'LINK', 'UNI', 'WETH', 'AAVE'];
-  const token = tokens[Math.floor(Math.random() * tokens.length)];
+  // Hanya gunakan token utama tema riset skripsi: PEPE, LINK, UNI
+  const allowed = ['PEPE', 'LINK', 'UNI'];
+  const userFiltered = (userTokens && Array.isArray(userTokens))
+    ? userTokens.map(t => String(t).toUpperCase()).filter(t => allowed.includes(t))
+    : [];
+  const pool = userFiltered.length > 0 ? userFiltered : allowed;
+  const token = pool[Math.floor(Math.random() * pool.length)];
   const direction = Math.random() > 0.5 ? 'BUY' : 'SELL';
 
   // Random USD value between $500 and $1,250,000
@@ -24,9 +29,7 @@ function generateRandomDemoAlert(userTokens = []) {
   if (token === 'PEPE') unitPrice = 0.000008 + Math.random() * 0.000007;
   else if (token === 'LINK') unitPrice = 14 + Math.random() * 5;
   else if (token === 'UNI') unitPrice = 6 + Math.random() * 5;
-  else if (token === 'WETH') unitPrice = 3100 + Math.random() * 400;
-  else if (token === 'AAVE') unitPrice = 85 + Math.random() * 50;
-  else unitPrice = 1 + Math.random() * 49;
+  else unitPrice = 10 + Math.random() * 10;
 
   const actionText = direction === 'BUY' ? 'membeli' : 'menjual';
   const circleEmoji = direction === 'BUY' ? '🟢' : '🔴';
