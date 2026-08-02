@@ -1,14 +1,68 @@
 // src/bot.js
-// Interactive Whale Bot — Telegram bot untuk whale alerts
+// Bot Telegram Interaktif — orchestrator utama
 
-const { TelegramBot } = require('node-telegram-bot-api');
-const { formatUSDLog, debugFormatUSD } = require('./utils/formatters');
+const TelegramBot = require('node-telegram-bot-api');
+const { WatchlistStore } = require('./storage/watchlistStore');
+const { MaintenanceStore } = require('./storage/maintenanceStore');
+const { MaintenanceService } = require('./services/maintenanceService');
+const { CallbackHandler } = require('./handlers/callbackHandler');
+const { setupStartCommand } = require('./commands/start');
+const { setupStopCommand } = require('./commands/stop');
+const { setupHelpCommand } = require('./commands/help');
+const { setupStatusCommand } = require('./commands/status');
+const { setupMaintenanceCommand } = require('./commands/maintenance');
+const { TokenHandler } = require('./handlers/tokenHandler');
+const { ThresholdHandler } = require('./handlers/thresholdHandler');
+const { createStatusIcon, formatUSDLog, debugFormatUSD } = require('./utils/formatter');
+const { ResearchHandler } = require('./handlers/researchHandler');
+const { setupResearchCommand } = require('./commands/research');
+const { setupTestAlertCommand } = require('./commands/testalert');
+const { setupDeteksiCommand } = require('./commands/deteksi');
 
 class InteractiveWhaleBot {
   constructor(token) {
-    this.bot = new TelegramBot(token, { polling: false });
-    this.watchlistStore = require('./storage/WatchlistStore');
-    this.maintenanceService = require('./services/maintenanceService');
+    this.bot = new TelegramBot(token, {
+      polling: {
+        interval: 0,
+        autoStart: true,
+        params: {
+          timeout: 10,
+          allowed_updates: JSON.stringify(['message', 'callback_query'])
+        }
+      }
+    });
+
+    // Initialize stores
+    this.watchlistStore = new WatchlistStore();
+    this.maintenanceStore = new MaintenanceStore();
+    this.maintenanceService = new MaintenanceService(
+      this.maintenanceStore,
+      this.watchlistStore,
+      this.bot
+    );
+
+    // Make services available globally
+    global.maintenanceService = this.maintenanceService;
+    global.botMenus = {
+      buildMainMenu: this.buildMainMenu.bind(this),
+      buildDashboardMenu: this.buildDashboardMenu.bind(this),
+      buildSettingsMenu: this.buildSettingsMenu.bind(this),
+      buildWatchlistMenu: this.buildWatchlistMenu.bind(this),
+      buildThresholdMenu: this.buildThresholdMenu.bind(this),
+      buildHelpMenu: this.buildHelpMenu.bind(this)
+    };
+
+    // User states for conversational inputs
+    this.userStates = new Map();
+
+    this.setupCommands();
+    this.setupCallbackHandler();
+    this.setupResearchHandler();
+
+    console.log('🤖 Bot interaktif aktif!');
+    if (this.maintenanceService.isActive()) {
+      console.log(`⚠️ MAINTENANCE MODE AKTIF — ${this.maintenanceService.getState().reason}`);
+    }
   }
 
   setTokenService(tokenService) {
@@ -23,13 +77,188 @@ class InteractiveWhaleBot {
     this.researchStore = researchStore;
   }
 
-  async startPolling() {
-    this.bot.startPolling();
+  setupCommands() {
+    setupStartCommand(this.bot, this.watchlistStore);
+    setupStopCommand(this.bot, this.watchlistStore);
+    setupHelpCommand(this.bot);
+    setupStatusCommand(this.bot, this.watchlistStore);
+    setupMaintenanceCommand(this.bot);
+    setupResearchCommand(this.bot);
+    setupTestAlertCommand(this.bot, this.watchlistStore);
+    setupDeteksiCommand(this.bot, this.watchlistStore);
+    console.log('⚡ /deteksi command registered');
+
+    // Catch-all message handler for conversational state (e.g. AWAITING_CONTRACT)
+    this.bot.on('message', async (msg) => {
+      if (!msg.text || msg.text.startsWith('/')) return;
+
+      const chatId = msg.chat.id;
+      const state = this.userStates.get(chatId);
+
+      if (state === 'AWAITING_CONTRACT') {
+        const text = msg.text.trim();
+        this.userStates.delete(chatId); // clear state immediately
+
+        const waitMsg = await this.bot.sendMessage(chatId, `⏳ Sedang memvalidasi kontrak ${text}...`);
+
+        try {
+          // Validate and fetch on-chain data
+          console.log(`[WATCHLIST] Contract Validated: ${text}`);
+          const { tokenData, isNew } = await this.tokenService.validateAndAddToken(text);
+          
+          const user = this.watchlistStore.getWatchlist(chatId, msg.from.first_name);
+          if (!user.tokens) user.tokens = [];
+
+          // Only reject if it already exists in the *user's* watchlist
+          if (user.tokens.includes(tokenData.symbol)) {
+            throw new Error(`Token ${tokenData.symbol} sudah ada di Watchlist kamu.`);
+          }
+
+          // Add to system listener dynamically ONLY if it's a globally new token
+          if (isNew) {
+            this.listener.addNewToken(tokenData);
+          }
+
+          // Add to user's watchlist
+          user.tokens.push(tokenData.symbol);
+          this.watchlistStore.set(chatId, user);
+          
+          console.log(`[WATCHLIST] Token Added: ${tokenData.symbol} by ${chatId}`);
+
+          await this.bot.editMessageText(
+            `✅ <b>Token Berhasil Ditambahkan</b>\n\nNama:\n${tokenData.symbol}\n\nSymbol:\n${tokenData.symbol}\n\nWatchlist Saat Ini:\n${user.tokens.length} Token`,
+            {
+              chat_id: chatId,
+              message_id: waitMsg.message_id,
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [[{ text: '⬅️ Kembali', callback_data: 'nav_watchlist' }]]
+              }
+            }
+          );
+        } catch (err) {
+          await this.bot.editMessageText(
+            `❌ <b>Gagal Menambahkan Token</b>\n\nAlasan: ${err.message}\n\nPastikan alamat kontrak ERC-20 valid.`,
+            {
+              chat_id: chatId,
+              message_id: waitMsg.message_id,
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '🔄 Coba Lagi', callback_data: 'menu_add_token' }],
+                  [{ text: '⬅️ Kembali', callback_data: 'nav_watchlist' }]
+                ]
+              }
+            }
+          );
+        }
+      }
+    });
+  }
+
+  setupCallbackHandler() {
+    const callbackHandler = new CallbackHandler(
+      this.bot,
+      this.watchlistStore,
+      this.maintenanceService,
+      global.botMenus,
+      this // Pass the InteractiveWhaleBot instance itself to access getStats()
+    );
+    callbackHandler.setup();
+  }
+
+  setupResearchHandler() {
+    const researchHandler = new ResearchHandler(this.bot);
+    researchHandler.setup();
+  }
+
+  buildMainMenu(user, isAdmin = false) {
+    const buttons = [
+      [
+        { text: '📊 Dashboard', callback_data: 'nav_dashboard' }
+      ],
+      [
+        { text: '⚙️ Pengaturan', callback_data: 'nav_settings' }
+      ]
+    ];
+
+    if (isAdmin) {
+      buttons.push([
+        { text: '📈 Statistik Penelitian', callback_data: 'nav_research_stats' }
+      ]);
+    }
+
+    buttons.push([
+      { text: '❓ Bantuan', callback_data: 'nav_help' }
+    ]);
+
+    return {
+      inline_keyboard: buttons
+    };
+  }
+
+  buildDashboardMenu(user) {
+    const trackingBtn = user.active 
+      ? { text: '⏹️ Hentikan Tracking', callback_data: 'tracking_stop' }
+      : { text: '▶️ Mulai Tracking', callback_data: 'tracking_start' };
+
+    return {
+      inline_keyboard: [
+        [ trackingBtn ],
+        [ { text: '📜 Riwayat Alert', callback_data: 'research_alerts_list' } ],
+        [ { text: '⬅️ Kembali', callback_data: 'nav_main' } ]
+      ]
+    };
+  }
+
+  buildSettingsMenu() {
+    return {
+      inline_keyboard: [
+        [ { text: '👀 Watchlist', callback_data: 'nav_watchlist' } ],
+        [ { text: '🎯 Threshold', callback_data: 'nav_threshold' } ],
+        [ { text: '⚡ Mode Deteksi Singkat', callback_data: 'nav_deteksi' } ],
+        [ { text: '⬅️ Kembali', callback_data: 'nav_main' } ]
+      ]
+    };
+  }
+
+  buildWatchlistMenu() {
+    return {
+      inline_keyboard: [
+        [
+          { text: '➕ Tambah Token', callback_data: 'menu_add_token' },
+          { text: '➖ Hapus Token', callback_data: 'menu_remove_token' }
+        ],
+        [ { text: '⚡ Preset Token (LINK, UNI, PEPE)', callback_data: 'menu_preset_popular' } ],
+        [ { text: '📋 Lihat Watchlist', callback_data: 'menu_my_watchlist' } ],
+        [ { text: '⬅️ Kembali', callback_data: 'nav_settings' } ]
+      ]
+    };
+  }
+
+  buildThresholdMenu() {
+    return {
+      inline_keyboard: [
+        [ { text: '💰 Set Min USD', callback_data: 'menu_threshold_usd' } ],
+        [ { text: '⬅️ Kembali', callback_data: 'nav_settings' } ]
+      ]
+    };
+  }
+
+
+  buildHelpMenu() {
+    return {
+      inline_keyboard: [
+        [ { text: '⬅️ Kembali', callback_data: 'nav_main' } ]
+      ]
+    };
   }
 
   async broadcast(alertData) {
+    // Skip broadcast jika maintenance aktif
     if (this.maintenanceService.isActive()) {
-      return [];
+      console.log(`⏭️ Alert diabaikan — maintenance mode aktif`);
+      return 0;
     }
 
     const { tokenSymbol, usdValue, riskCategory } = alertData;
@@ -37,7 +266,23 @@ class InteractiveWhaleBot {
     let filtered = 0;
     let totalSubs = 0;
 
+    console.log(`\n🔊 [BROADCAST] Starting for ${tokenSymbol} ${alertData.direction} | USD: ${formatUSDLog(usdValue)}`);
+    
+    // === DEBUG: Dump subscriber state ===
     const allSubs = this.watchlistStore.getAllActiveSubscribers();
+    console.log(`   📋 [BROADCAST] Subscriber store loaded: ${allSubs.length} active subscribers found`);
+    if (allSubs.length === 0) {
+      console.log(`   ⚠️ [BROADCAST] NO SUBSCRIBERS! Use /start di Telegram untuk subscribe.`);
+      return 0;
+    }
+    
+    // Log ringkasan setiap subscriber sebelum filtering
+    for (const user of allSubs) {
+      const tokensArr = user.tokens || [];
+      console.log(`   👤 Sub ${user.chatId} (${user.name}): active=${user.active} | tokens=[${tokensArr.join(',')}] | threshold=${user.threshold}`);
+    }
+    console.log(`   ---`);
+
     const sentChatIds = [];
 
     for (const user of allSubs) {
@@ -47,29 +292,39 @@ class InteractiveWhaleBot {
       // === FILTER: active ===
       if (!user.active) {
         filtered++;
+        console.log(`   ❌ [F1-ACTIVE] Skip ${chatId} (${user.name}): active=${user.active}`);
         continue;
       }
+      console.log(`   ✅ [F1-ACTIVE] ${chatId} (${user.name}): active=true`);
       
       // === FILTER: token watchlist ===
       const hasToken = user.tokens instanceof Set ? user.tokens.has(tokenSymbol) : (Array.isArray(user.tokens) ? user.tokens.includes(tokenSymbol) : false);
       if (!hasToken) {
         filtered++;
+        const tokensArr = user.tokens instanceof Set ? [...user.tokens] : (Array.isArray(user.tokens) ? user.tokens : []);
+        console.log(`   ❌ [F2-TOKEN] Skip ${chatId} (${user.name}): token "${tokenSymbol}" NOT in watchlist [${tokensArr.join(',')}]`);
         continue;
       }
+      console.log(`   ✅ [F2-TOKEN] ${chatId} (${user.name}): token "${tokenSymbol}" found in watchlist`);
       
       // === FILTER: USD threshold ===
       if (usdValue < user.threshold) {
         filtered++;
+        console.log(`   ❌ [F3-THRESHOLD] Skip ${chatId} (${user.name}): ${debugFormatUSD(usdValue, user.threshold)}`);
         continue;
       }
+      console.log(`   ✅ [F3-THRESHOLD] ${chatId} (${user.name}): ${debugFormatUSD(usdValue, user.threshold)}`);
+
 
       // === ALL FILTERS PASSED — SEND MESSAGE ===
       try {
+        console.log(`   📤 [SENDING] Preparing Telegram message for ${chatId} (${user.name})...`);
         const { NotificationService } = require('./services/notifier');
         const isSimpleMode = !!user.deteksiMode;
         const message = isSimpleMode
           ? NotificationService.formatSimpleDetectionAlert(alertData)
           : NotificationService.formatWhaleAlert(alertData);
+        console.log(`   📤 [SENDING] Message formatted (${message.length} chars, simpleMode=${isSimpleMode}), calling sendMessage...`);
 
         await this.bot.sendMessage(chatId, message, {
           parse_mode: 'HTML',
@@ -85,11 +340,30 @@ class InteractiveWhaleBot {
         user.alertCount = (user.alertCount || 0) + 1;
         this.watchlistStore.saveSettings(chatId, { alertCount: user.alertCount });
         sentChatIds.push(chatId);
+        console.log(`   ✅ [SENT] Successfully sent to ${chatId} (${user.name}) — alertCount now: ${user.alertCount}`);
       } catch (err) {
         if (err.message.includes('blocked') || err.message.includes('not found')) {
           this.watchlistStore.delete(chatId);
+          console.log(`   ❌ [ERROR] User ${chatId} removed (blocked/not found): ${err.message}`);
+        } else {
+          console.log(`   ⚠️ [ERROR] Failed sending to ${chatId}: ${err.message}`);
         }
       }
+    }
+
+    console.log(`\n📱 [BROADCAST RESULT] Sent: ${sentChatIds.length}/${totalSubs} | Filtered: ${filtered} | Token: ${tokenSymbol} | USD: ${formatUSDLog(usdValue)}`);
+    if (sentChatIds.length > 0) {
+      console.log(`   💾 Subscriber data saved (alertCount updated)`);
+    }
+    if (sentChatIds.length === 0 && totalSubs > 0) {
+      console.log(`   ⚠️ Semua subscriber di-filter. Kemungkinan penyebab:`);
+      console.log(`      - User tidak active (belum klik "Mulai Tracking")`);
+      console.log(`      - Token ${tokenSymbol} tidak ada di watchlist user`);
+      console.log(`      - USD value ${formatUSDLog(usdValue)} di bawah threshold user`);
+      console.log(`      - Risk ${riskCategory} tidak sesuai filter user`);
+    }
+    if (totalSubs === 0) {
+      console.log(`   → No subscribers yet, use /start to subscribe`);
     }
 
     return sentChatIds;
