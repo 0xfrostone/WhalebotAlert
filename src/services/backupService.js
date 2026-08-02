@@ -4,76 +4,126 @@ const path = require('path');
 const StorageManager = require('../storage/StorageManager');
 
 class BackupService {
-  constructor() {
-    this.filesToBackup = ['subscribers.json', 'watchlists.json', 'tokens.json'];
-    this.maxBackups = 7;
+  constructor(bot = null) {
+    this.bot = bot;
+    this.maxBackups = 14;
   }
 
-  runBackup() {
-    console.log('[BACKUP] Starting daily backup routine...');
-    const dateStr = new Date().toISOString().split('T')[0];
-
-    this.filesToBackup.forEach(filename => {
-      const sourcePath = StorageManager.getFilePath(filename);
-      if (fs.existsSync(sourcePath)) {
-        const backupFilename = `${path.basename(filename, '.json')}_${dateStr}.json`;
-        const backupPath = StorageManager.getBackupsPath(backupFilename);
-        
-        try {
-          fs.copyFileSync(sourcePath, backupPath);
-          console.log(`[BACKUP] Backup created: ${backupFilename}`);
-        } catch (err) {
-          console.error(`[BACKUP] Error backing up ${filename}:`, err.message);
-        }
-      }
-    });
-
-    this.cleanupOldBackups();
+  setBot(bot) {
+    this.bot = bot;
   }
 
-  cleanupOldBackups() {
-    const backupsDir = StorageManager.getBackupsPath('');
-    if (!fs.existsSync(backupsDir)) return;
+  generateCombinedBackupJSON() {
+    const researchStats = StorageManager.readJSON('research_stats.json', {});
+    const allAlerts = StorageManager.getAllUsersAlerts();
+    const watchlists = StorageManager.readJSON('watchlists.json', {});
+    const wallets = StorageManager.readJSON('wallets.json', []);
+
+    return {
+      backupDate: new Date().toISOString(),
+      systemVersion: '2.0',
+      research_stats: researchStats,
+      alerts: allAlerts,
+      watchlists: watchlists,
+      wallets: wallets
+    };
+  }
+
+  createLocalBackup() {
+    try {
+      const backupData = this.generateCombinedBackupJSON();
+      const dateStr = new Date().toISOString().split('T')[0];
+      const filename = `whalebot_backup_${dateStr}.json`;
+      const filePath = StorageManager.getBackupsPath(filename);
+
+      fs.writeFileSync(filePath, JSON.stringify(backupData, null, 2), 'utf8');
+      console.log(`[BACKUP] Combined backup created: ${filename} (${backupData.alerts ? backupData.alerts.length : 0} alerts)`);
+      return { filePath, filename, backupData };
+    } catch (err) {
+      console.error('[BACKUP] Local backup error:', err.message);
+      return null;
+    }
+  }
+
+  async sendBackupToAdminTelegram() {
+    if (!this.bot) return;
+    const adminId = process.env.ADMIN_IDS;
+    if (!adminId || adminId.includes('ISI_')) return;
 
     try {
-      const files = fs.readdirSync(backupsDir);
-      
-      // Group files by base type (e.g. 'subscribers', 'watchlists')
-      const groups = {};
-      files.forEach(file => {
-        const match = file.match(/^([a-z]+)_(\d{4}-\d{2}-\d{2})\.json$/);
-        if (match) {
-          const type = match[1];
-          if (!groups[type]) groups[type] = [];
-          groups[type].push(file);
-        }
-      });
+      const res = this.createLocalBackup();
+      if (!res) return;
 
-      // For each type, sort by date descending and delete older than maxBackups
-      for (const [type, groupFiles] of Object.entries(groups)) {
-        groupFiles.sort().reverse(); // newest first
-        if (groupFiles.length > this.maxBackups) {
-          const toDelete = groupFiles.slice(this.maxBackups);
-          toDelete.forEach(file => {
-            const filePath = path.join(backupsDir, file);
-            fs.unlinkSync(filePath);
-            console.log(`[BACKUP] Old backup removed: ${file}`);
-          });
+      const caption = [
+        `💾 <b>BACKUP DATASET PENELITIAN OTOMATIS</b>`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        `Tanggal   : <b>${new Date().toLocaleString('id-ID')}</b>`,
+        `Total Alert: <b>${res.backupData.alerts.length} Transaksi</b>`,
+        `Research Stats: <b>OK</b>`,
+        ``,
+        `<i>File ini disimpan aman di cloud Telegram Chat. Jika VPS mati/reset, gunakan file ini untuk /restore.</i>`
+      ].join('\n');
+
+      await this.bot.sendDocument(adminId, res.filePath, {
+        caption: caption,
+        parse_mode: 'HTML'
+      });
+      console.log(`[BACKUP] Backup sent to Admin Telegram (${adminId}) successfully!`);
+    } catch (err) {
+      console.error('[BACKUP] Error sending backup to Telegram:', err.message);
+    }
+  }
+
+  restoreFromBackupJSON(backupData, targetChatId = null) {
+    try {
+      if (!backupData || !backupData.research_stats) {
+        throw new Error('Format file backup tidak valid!');
+      }
+
+      // Restore research_stats.json
+      if (backupData.research_stats) {
+        StorageManager.writeJSON('research_stats.json', backupData.research_stats);
+      }
+
+      // Restore wallets.json
+      if (Array.isArray(backupData.wallets)) {
+        StorageManager.writeJSON('wallets.json', backupData.wallets);
+      }
+
+      // Restore watchlists.json
+      if (backupData.watchlists) {
+        StorageManager.writeJSON('watchlists.json', backupData.watchlists);
+      }
+
+      // Restore alerts.json for targetChatId or admin
+      if (Array.isArray(backupData.alerts)) {
+        const target = targetChatId || process.env.ADMIN_IDS;
+        if (target) {
+          StorageManager.writeUserJSON(target, 'alerts.json', backupData.alerts);
         }
       }
+
+      return {
+        success: true,
+        alertsCount: backupData.alerts ? backupData.alerts.length : 0,
+        researchStats: backupData.research_stats
+      };
     } catch (err) {
-      console.error('[BACKUP] Error during cleanup:', err.message);
+      console.error('[RESTORE ERROR]', err.message);
+      return { success: false, error: err.message };
     }
   }
 
   startCron() {
-    // Run backup immediately on startup
-    this.runBackup();
+    // Run initial backup after 1 minute of bot launch
+    setTimeout(() => {
+      this.sendBackupToAdminTelegram();
+    }, 60000);
 
-    // Then run every 24 hours
+    // Run every 12 hours
     setInterval(() => {
-      this.runBackup();
-    }, 24 * 60 * 60 * 1000);
+      this.sendBackupToAdminTelegram();
+    }, 12 * 60 * 60 * 1000);
   }
 }
 

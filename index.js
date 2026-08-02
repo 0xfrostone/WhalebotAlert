@@ -120,9 +120,13 @@ async function main() {
   // Inisialisasi bot interaktif
   const bot = new InteractiveWhaleBot(process.env.TELEGRAM_BOT_TOKEN);
 
-  // Inisialisasi sistem Backup
-  const backupService = new BackupService();
+  // Inisialisasi sistem Backup & Backup Commands
+  const { BackupService } = require('./src/services/backupService');
+  const backupService = new BackupService(bot.bot);
   backupService.startCron();
+
+  const { setupBackupCommands } = require('./src/commands/backup');
+  setupBackupCommands(bot.bot);
 
   // Inisialisasi ResearchStore
   const { ResearchStore } = require('./src/storage/researchStore');
