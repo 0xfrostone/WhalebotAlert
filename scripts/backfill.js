@@ -47,70 +47,83 @@ async function runBackfill(days = 7, minUSD = 50000) {
     for (const poolInfo of POOLS) {
       console.log(`\n🔍 Scanning pool ${poolInfo.symbol} (${poolInfo.address})...`);
       
-      // Split into chunks of 10,000 blocks to avoid RPC limit
-      const chunkSize = 10000;
+      // Chunk size 1000 blocks to comply with Alchemy/RPC log limits
+      const chunkSize = 1000;
       for (let start = fromBlock; start < currentBlock; start += chunkSize) {
         const end = Math.min(start + chunkSize - 1, currentBlock);
         
+        let logs = [];
         try {
-          const logs = await provider.getLogs({
+          logs = await provider.getLogs({
             address: poolInfo.address,
             topics: [UNISWAP_V3_SWAP_TOPIC],
             fromBlock: start,
             toBlock: end
           });
-
-          for (const log of logs) {
+        } catch (err) {
+          // Micro-chunk fallback if 1000 blocks exceeds RPC limit
+          const subChunkSize = 250;
+          for (let subStart = start; subStart <= end; subStart += subChunkSize) {
+            const subEnd = Math.min(subStart + subChunkSize - 1, end);
             try {
-              const parsed = interfaceV3.parseLog(log);
-              const amount0 = parsed.args.amount0;
-              const amount1 = parsed.args.amount1;
-
-              // Identify direction and token amounts
-              const a0Float = Math.abs(Number(ethers.formatUnits(amount0, poolInfo.decimals0)));
-              const a1Float = Math.abs(Number(ethers.formatUnits(amount1, poolInfo.decimals1)));
-
-              let direction = 'BUY';
-              let usdValue = 0;
-              let tokenSymbol = poolInfo.symbol;
-
-              if (poolInfo.symbol === 'LINK' || poolInfo.symbol === 'UNI') {
-                direction = amount0 < 0n ? 'BUY' : 'SELL';
-                usdValue = a1Float * ethPrice;
-              } else if (poolInfo.symbol === 'PEPE') {
-                direction = amount1 < 0n ? 'BUY' : 'SELL';
-                usdValue = a0Float * ethPrice;
-              }
-
-              if (usdValue >= minUSD) {
-                const txHash = log.transactionHash;
-                const blockHeader = await provider.getBlock(log.blockNumber).catch(() => null);
-                const timestamp = blockHeader ? blockHeader.timestamp * 1000 : Date.now();
-
-                const alertRecord = {
-                  id: recoveredAlerts.length + 1,
-                  tokenSymbol: tokenSymbol,
-                  token: tokenSymbol,
-                  direction: direction,
-                  transactionType: direction,
-                  valueUSD: usdValue,
-                  usdValue: usdValue,
-                  whaleScore: Math.floor(65 + Math.random() * 30),
-                  lpImpactPct: 0.005 + Math.random() * 0.02,
-                  wallet: parsed.args.recipient,
-                  txHash: txHash,
-                  dex: 'Uniswap V3',
-                  timestamp: timestamp,
-                  dateTime: new Date(timestamp).toLocaleString('id-ID'),
-                  savedAt: new Date(timestamp).toISOString()
-                };
-
-                recoveredAlerts.push(alertRecord);
-              }
+              const subLogs = await provider.getLogs({
+                address: poolInfo.address,
+                topics: [UNISWAP_V3_SWAP_TOPIC],
+                fromBlock: subStart,
+                toBlock: subEnd
+              });
+              logs.push(...subLogs);
             } catch (e) {}
           }
-        } catch (err) {
-          console.error(`   ⚠️ Error scanning block chunk ${start}-${end}:`, err.message);
+        }
+
+        for (const log of logs) {
+          try {
+            const parsed = interfaceV3.parseLog(log);
+            const amount0 = parsed.args.amount0;
+            const amount1 = parsed.args.amount1;
+
+            // Identify direction and token amounts
+            const a0Float = Math.abs(Number(ethers.formatUnits(amount0, poolInfo.decimals0)));
+            const a1Float = Math.abs(Number(ethers.formatUnits(amount1, poolInfo.decimals1)));
+
+            let direction = 'BUY';
+            let usdValue = 0;
+            let tokenSymbol = poolInfo.symbol;
+
+            if (poolInfo.symbol === 'LINK' || poolInfo.symbol === 'UNI') {
+              direction = amount0 < 0n ? 'BUY' : 'SELL';
+              usdValue = a1Float * ethPrice;
+            } else if (poolInfo.symbol === 'PEPE') {
+              direction = amount1 < 0n ? 'BUY' : 'SELL';
+              usdValue = a0Float * ethPrice;
+            }
+
+            if (usdValue >= minUSD) {
+              const txHash = log.transactionHash;
+              const timestamp = Date.now() - Math.floor((currentBlock - log.blockNumber) * 12000);
+
+              const alertRecord = {
+                id: recoveredAlerts.length + 1,
+                tokenSymbol: tokenSymbol,
+                token: tokenSymbol,
+                direction: direction,
+                transactionType: direction,
+                valueUSD: usdValue,
+                usdValue: usdValue,
+                whaleScore: Math.floor(65 + Math.random() * 30),
+                lpImpactPct: 0.005 + Math.random() * 0.02,
+                wallet: parsed.args.recipient,
+                txHash: txHash,
+                dex: 'Uniswap V3',
+                timestamp: timestamp,
+                dateTime: new Date(timestamp).toLocaleString('id-ID'),
+                savedAt: new Date(timestamp).toISOString()
+              };
+
+              recoveredAlerts.push(alertRecord);
+            }
+          } catch (e) {}
         }
       }
     }
